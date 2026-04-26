@@ -1,0 +1,85 @@
+---
+title: Installation
+description: Install Antares via Composer
+---
+
+## Full starting APP
+
+It will pull in a skeleton project to get you started fast, with some example files
+
+```bash
+composer create-project fatjon-lleshi/antares-app
+```
+
+## Standalone Packages
+
+Core package, which pulls in the container, router, and validation packages automatically,
+best value will be gained fron installing the app above.
+
+```bash
+composer require fatjon-lleshi/antares
+```
+
+Each package can be used independently:
+
+```bash
+composer require fatjon-lleshi/antares-container
+composer require fatjon-lleshi/antares-router
+composer require fatjon-lleshi/antares-validation
+```
+
+## Bridge Packages
+
+Install optional bridge packages for logging and database access, 
+these are convenience packages providing the service via auto Discovery
+you just skip the service registration part
+
+```bash
+composer require fatjon-lleshi/antares-monolog-bridge
+composer require fatjon-lleshi/antares-eloquent-bridge
+```
+
+## Directory Structure
+
+A typical Antares project looks like this:
+
+```
+my-app/
+├── app/
+│   ├── Controllers/
+│   ├── DTOs/
+│   ├── Guards/
+│   ├── Middleware/
+│   ├── Responses/
+│   └── Providers/
+│       ├── AppServiceProvider.php
+│       └── RouteServiceProvider.php
+├── public/
+│   └── index.php
+├── storage/
+│   ├── cache/
+│   └── logs/
+├── .env.exmaple
+└── composer.json
+└── worker.php
+└── swoole.php
+```
+
+## Environment File
+
+Antares uses `vlucas/phpdotenv` to load environment variables. Create a `.env` file in your project root:
+
+```env
+APP_ENV=local
+APP_NAME=my-app
+
+DB_DRIVER=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=my_db
+DB_USERNAME=root
+DB_PASSWORD=
+
+LOG_CHANNEL=file
+LOG_LEVEL=debug
+```

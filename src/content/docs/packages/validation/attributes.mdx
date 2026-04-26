@@ -1,0 +1,68 @@
+---
+title: Validation Attributes
+description: Full reference of built-in validation attributes
+---
+
+## Strings
+
+| Attribute | Description |
+|---|---|
+| `#[NotBlank]` | Value must not be empty |
+| `#[MinLength(n)]` | Minimum string length |
+| `#[MaxLength(n)]` | Maximum string length |
+| `#[Email]` | Valid email address |
+| `#[Url]` | Valid URL |
+| `#[Pattern('/regex/')]` | Matches regular expression |
+| `#[Alpha]` | Alphabetic characters only |
+| `#[AlphaNumeric]` | Alphanumeric characters only |
+| `#[Numeric]` | Numeric string |
+| `#[HexColor]` | Valid hex color (`#fff` or `#ffffff`) |
+| `#[Uuid]` | Valid UUID v4 |
+| `#[Phone]` | Valid phone number |
+| `#[Ip]` | Valid IP address (v4 or v6) |
+| `#[Json]` | Valid JSON string |
+
+## Numbers
+
+| Attribute | Description |
+|---|---|
+| `#[Min(n)]` | Minimum numeric value |
+| `#[Max(n)]` | Maximum numeric value |
+| `#[Between(min, max)]` | Value within range (inclusive) |
+| `#[Positive]` | Value must be positive |
+| `#[Negative]` | Value must be negative |
+
+## General
+
+| Attribute | Description |
+|---|---|
+| `#[NotNull]` | Value must not be null |
+| `#[In([...])]` | Value must be in the given list |
+| `#[InEnum(MyEnum::class)]` | Value must be a valid enum case |
+| `#[Size(n)]` | Array must have exactly n elements |
+| `#[ArrayOf(type)]` | All array elements must be of the given type |
+| `#[Date]` | Valid date string (`Y-m-d`) |
+| `#[DateTime]` | Valid datetime string (`Y-m-d H:i:s`) |
+
+## DTO Markers
+
+| Attribute | Description |
+|---|---|
+| `#[Dto]` | Marks a class as hydratable |
+| `#[Strict]` | Enables strict type checking during hydration |
+
+## Validation Error Response
+
+When validation fails, the framework returns a `422` response with a field-level error map:
+
+```json
+{
+    "type": "https://antares.dev/errors",
+    "title": "Validation failed",
+    "status": 422,
+    "errors": {
+        "email": ["Must be a valid email address"],
+        "name": ["Must be at least 2 characters"]
+    }
+}
+```

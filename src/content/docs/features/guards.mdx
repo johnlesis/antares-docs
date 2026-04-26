@@ -1,0 +1,134 @@
+---
+title: Guards
+description: Authenticate requests and inject the resolved principal into your controller
+---
+
+A guard authenticates an incoming request and returns a typed value — usually the authenticated user or tenant — which is then injected directly into your controller method. If the guard throws, the request is rejected before anything else runs.
+
+---
+
+## Writing a Guard
+
+A guard is a plain class with a `resolve(ServerRequestInterface $request)` method. It can have constructor dependencies — the container autowires them:
+
+```php
+use Psr\Http\Message\ServerRequestInterface;
+use Antares\Exceptions\HttpException;
+
+final class JwtGuard
+{
+    public function __construct(
+        private readonly JwtService $jwt,
+    ) {}
+
+    public function resolve(ServerRequestInterface $request): AuthUser
+    {
+        $header = $request->getHeaderLine('Authorization');
+        $token  = ltrim($header, 'Bearer ');
+
+        $user = $this->jwt->decode($token);
+
+        if ($user === null) {
+            throw new HttpException(401, 'Unauthorized');
+        }
+
+        return $user;
+    }
+}
+```
+
+---
+
+## Using a Guard
+
+Apply `#[Guards(GuardClass::class)]` to the parameter that should receive the resolved value:
+
+```php
+use Antares\Http\Attributes\Guards;
+
+class PostController
+{
+    #[Post('/posts', 201)]
+    public function store(
+        #[Guards(JwtGuard::class)] AuthUser $user,
+        CreatePostRequest $request,
+    ): PostResponse {
+        return new PostResponse(
+            id: 1,
+            title: $request->title,
+            authorId: $user->id,
+        );
+    }
+}
+```
+
+The guard runs first. If it throws, the DTO is never hydrated and the controller method is never called.
+
+---
+
+## Multiple Guards
+
+Different routes can use different guards. You can also stack multiple guards on a single method:
+
+```php
+class ReportController
+{
+    #[Get('/reports')]
+    public function index(
+        #[Guards(TenantGuard::class)] Tenant $tenant,
+        #[Guards(JwtGuard::class)] AuthUser $user,
+    ): array {
+        return ['tenant' => $tenant->id, 'user' => $user->id];
+    }
+}
+```
+
+Guards run in the order they appear in the parameter list.
+
+---
+
+## Role-Based Access
+
+Guards are a natural place to enforce roles. Throw an `HttpException` with `403` if the resolved user does not have the required access:
+
+```php
+final class AdminGuard
+{
+    public function __construct(
+        private readonly JwtService $jwt,
+    ) {}
+
+    public function resolve(ServerRequestInterface $request): AuthUser
+    {
+        $user = $this->jwt->decode(
+            ltrim($request->getHeaderLine('Authorization'), 'Bearer ')
+        );
+
+        if ($user === null) {
+            throw new HttpException(401, 'Unauthorized');
+        }
+
+        if (!$user->isAdmin()) {
+            throw new HttpException(403, 'Forbidden');
+        }
+
+        return $user;
+    }
+}
+```
+
+```php
+#[Delete('/users/{id}', 204)]
+public function destroy(
+    #[Guards(AdminGuard::class)] AuthUser $user,
+    int $id,
+): void {
+    // only admins reach here
+}
+```
+
+---
+
+## Guards Are Request-Scoped
+
+Guards always receive the `ServerRequestInterface` and are designed to authenticate based on request data — headers, cookies, tokens. If you need logic that has nothing to do with the current request, that belongs in a plain service resolved by the container, not a guard.

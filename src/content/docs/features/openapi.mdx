@@ -1,0 +1,168 @@
+---
+title: OpenAPI
+description: Auto-generated OpenAPI 3.0 documentation
+---
+
+Antares auto-generates an OpenAPI 3.0 specification from your controllers, request DTOs, and response DTOs. No extra configuration is required.
+
+## Endpoints
+
+Two routes are registered automatically on boot:
+
+| Route | Description |
+|---|---|
+| `GET /openapi.json` | The raw OpenAPI 3.0 spec as JSON |
+| `GET /docs` | Swagger UI, pre-configured against `/openapi.json` |
+
+## What Gets Generated
+
+The spec is built entirely from your code:
+
+- **Paths & methods** — derived from `#[Get]`, `#[Post]`, `#[Put]`, `#[Patch]`, `#[Delete]` attributes
+- **Request body schema** — derived from `#[Dto]` class properties and their validation attributes (`#[Email]`, `#[Min]`, `#[MaxLength]`, etc.)
+- **Response schema** — derived from `#[ResponseDto]` class properties and serialization attributes
+- **Hidden fields** — properties annotated with `#[Hide]` are excluded from both request and response schemas
+- **Renamed fields** — `#[SerializeAs('key')]` overrides are reflected in the response schema
+
+---
+
+## Example
+
+Given this DTO, response, and controller:
+
+```php
+#[Dto]
+readonly class CreatePostRequest
+{
+    public function __construct(
+        #[NotBlank]
+        #[MinLength(5)]
+        public string $title,
+
+        #[NotBlank]
+        #[MinLength(20)]
+        public string $body,
+
+        #[In(['draft', 'published'])]
+        public string $status = 'draft',
+    ) {}
+}
+
+#[ResponseDto(case: 'snake_case')]
+readonly class PostResponse
+{
+    public function __construct(
+        public int $id,
+        public string $title,
+        public string $body,
+        public string $status,
+
+        #[SerializeAs('author_id')]
+        public int $userId,
+
+        #[Hide]
+        public string $internalNotes,
+
+        #[SerializeAs('created_at')]
+        public string $createdAt,
+    ) {}
+
+    #[Computed]
+    public function excerpt(): string
+    {
+        return mb_strimwidth($this->body, 0, 120, '...');
+    }
+}
+
+class PostController
+{
+    #[Post('/posts', 201)]
+    public function store(
+        #[Guards(JwtGuard::class)] AuthUser $user,
+        CreatePostRequest $request,
+    ): PostResponse {}
+}
+```
+
+Antares generates:
+
+```json
+{
+    "/posts": {
+        "post": {
+            "summary": "Store",
+            "operationId": "store",
+            "requestBody": {
+                "required": true,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["title", "body"],
+                            "properties": {
+                                "title": {
+                                    "type": "string",
+                                    "minLength": 5
+                                },
+                                "body": {
+                                    "type": "string",
+                                    "minLength": 20
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["draft", "published"],
+                                    "default": "draft"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "201": {
+                    "description": "Created",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "id": { "type": "integer" },
+                                    "title": { "type": "string" },
+                                    "body": { "type": "string" },
+                                    "status": { "type": "string" },
+                                    "author_id": { "type": "integer" },
+                                    "created_at": { "type": "string" },
+                                    "excerpt": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+`internalNotes` is excluded. `userId` appears as `author_id`. `excerpt` is included as a computed field. The request schema reflects all validation constraints.
+
+---
+
+## Deprecated Routes
+
+Mark a route as deprecated in the spec using `#[Deprecated]`:
+
+```php
+use Antares\OpenApi\Attributes\Deprecated;
+use Antares\Router\Attributes\Get;
+
+class UserController
+{
+    #[Get('/v1/users')]
+    #[Deprecated]
+    public function indexV1(): array {}
+
+    #[Get('/v2/users')]
+    public function indexV2(): UserListResponse {}
+}
+```

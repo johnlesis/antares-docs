@@ -1,0 +1,35 @@
+---
+title: Introduction
+description: Antares — a lightweight, API-focused PHP framework for PHP 8.2+
+---
+
+Antares is a lightweight, API-focused PHP framework built around **explicitness**, **type safety**, and **contract-first design**. 
+
+It provides everything you need to build a modern JSON API — a DI container, attribute-based routing, DTO hydration & validation, Response serialization, a middleware pipeline, 
+
+And auto-generated OpenAPI docs — with zero magic and no hidden conventions.
+
+## Philosophy
+
+- **Explicit over implicit.** Every request and response is typed. Routes are defined where you can see them — attributes, array config, or YAML.
+- **Type-safe by default.** PHP 8.2+ readonly DTOs, strict hydration, and reflection-based resolution throughout.
+- **Composable packages.** Each concern lives in its own Composer package. Use the full framework or pull in only what you need.
+- **No configuration tax.** Route caching and cache invalidation in Production, bridge auto-discovery
+- **Zero bootstrap overhead.** Built for worker runtimes — Swoole and FrankenPHP keep the app alive between requests.
+- **Composable.* Use the full framework or pull in just the container, router, or validation package independently.
+- **OpenAPI included.**  You define the contract — typed requests in, typed responses out. The docs write themselves.
+
+## Packages
+
+| Package | Composer name | Description |
+|---|---|---|
+| `core` | `fatjon-lleshi/antares` | Application boot, Dispatcher, Pipeline, ErrorHandler, OpenAPI |
+| `container` | `fatjon-lleshi/antares-container` | Reflection-based autowiring DI container |
+| `router` | `fatjon-lleshi/antares-router` | Attribute-based routing on top of `nikic/fast-route` |
+| `validation` | `fatjon-lleshi/antares-validation` | DTO hydration + attribute-driven validation |
+| `bridges/monolog` | `fatjon-lleshi/antares-monolog-bridge` | PSR-3 logger via Monolog |
+| `bridges/eloquent` | `fatjon-lleshi/antares-eloquent-bridge` | Eloquent ORM integration |
+
+## Requirements
+
+- PHP 8.2+

@@ -1,0 +1,83 @@
+---
+title: Migrations
+description: Database migrations via raw PDO, independent of any ORM
+---
+
+Antares ships its own migration system built on raw PDO — no ORM required. It works with any database driver and sits completely independently of the Eloquent bridge or any other ORM you choose to use.
+
+Supported drivers: MySQL, PostgreSQL, SQL Server, and Oracle.
+
+---
+
+## Creating a Migration
+
+```bash
+php bin/antares make:migration create_users_table
+```
+
+This creates a file in `database/migrations/` with a timestamp prefix, e.g. `2024_01_15_103000_create_users_table.php`:
+
+```php
+use Antares\Database\Migration;
+use PDO;
+
+class CreateUsersTable extends Migration
+{
+    public function up(PDO $pdo): void
+    {
+        $pdo->exec("
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+    }
+
+    public function down(PDO $pdo): void
+    {
+        $pdo->exec("DROP TABLE IF EXISTS users");
+    }
+}
+```
+
+---
+
+## Running Migrations
+
+Run all pending migrations:
+
+```bash
+php bin/antares migrate
+```
+
+Migrations are tracked in a `migrations` table. Already-ran migrations are skipped. Each run is grouped into a batch.
+
+---
+
+## Rolling Back
+
+Roll back the last batch of migrations:
+
+```bash
+php bin/antares migrate:rollback
+```
+
+Migrations in the last batch are rolled back in reverse order, calling each migration's `down()` method.
+
+---
+
+## How It Works
+
+- Migration files live in `database/migrations/`
+- Files are sorted and run in order by their timestamp prefix
+- A `migrations` table tracks what has run and which batch it belongs to
+- The `migrations` table is created automatically on first run
+- Each migration receives a raw `PDO` instance — write any SQL your database supports
+
+---
+
+## ORM Independence
+
+Migrations use raw PDO directly, so they work regardless of which ORM you use. Pair them with the Eloquent bridge, use a different ORM, or skip an ORM entirely — migrations don't care.

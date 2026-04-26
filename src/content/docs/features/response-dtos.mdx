@@ -1,0 +1,217 @@
+---
+title: Response DTOs
+description: Shape and control your JSON responses with typed objects
+---
+
+A Response DTO is a typed object that represents what you send back to the client. Instead of building arrays by hand, you return a class and Antares serializes it to JSON — applying field renaming, hiding internal properties, and computing derived values along the way.
+
+---
+
+## Defining a Response DTO
+
+Annotate a readonly class with `#[ResponseDto]`:
+
+```php
+use Antares\Serialization\Attributes\ResponseDto;
+
+#[ResponseDto]
+readonly class UserResponse
+{
+    public function __construct(
+        public int $id,
+        public string $name,
+        public string $email,
+    ) {}
+}
+```
+
+Return it from a controller method:
+
+```php
+#[Get('/users/{id}')]
+public function show(int $id): UserResponse
+{
+    return new UserResponse(id: $id, name: 'John', email: 'john@example.com');
+}
+```
+
+The client receives:
+
+```json
+{
+    "id": 1,
+    "name": "John",
+    "email": "john@example.com"
+}
+```
+
+---
+
+## Hiding Fields
+
+Use `#[Hide]` to exclude a property from the serialized output. Useful for internal fields that should never leave the server:
+
+```php
+#[ResponseDto]
+readonly class UserResponse
+{
+    public function __construct(
+        public int $id,
+        public string $name,
+
+        #[Hide]
+        public string $passwordHash,
+
+        #[Hide]
+        public string $internalNotes,
+    ) {}
+}
+```
+
+---
+
+## Renaming Fields
+
+Use `#[SerializeAs('key')]` to output a property under a different name:
+
+```php
+use Antares\Serialization\Attributes\SerializeAs;
+
+#[ResponseDto]
+readonly class PostResponse
+{
+    public function __construct(
+        public int $id,
+        public string $title,
+
+        #[SerializeAs('author_id')]
+        public int $userId,
+
+        #[SerializeAs('published_at')]
+        public string $createdAt,
+    ) {}
+}
+```
+
+```json
+{
+    "id": 1,
+    "title": "Hello World",
+    "author_id": 42,
+    "published_at": "2024-01-15 10:30:00"
+}
+```
+
+---
+
+## Computed Fields
+
+Use `#[Computed]` on a public method to include its return value as a field in the response. The method name becomes the key, converted using the DTO's case setting:
+
+```php
+use Antares\Serialization\Attributes\Computed;
+
+#[ResponseDto]
+readonly class PostResponse
+{
+    public function __construct(
+        public int $id,
+        public string $title,
+        public string $body,
+    ) {}
+
+    #[Computed]
+    public function excerpt(): string
+    {
+        return mb_strimwidth($this->body, 0, 120, '...');
+    }
+}
+```
+
+```json
+{
+    "id": 1,
+    "title": "Hello World",
+    "body": "Full body here...",
+    "excerpt": "Full body here..."
+}
+```
+
+---
+
+## Case Conversion
+
+By default property names are output in `camelCase`. Pass a `case` argument to `#[ResponseDto]` to change this:
+
+```php
+#[ResponseDto(case: 'snake_case')]
+readonly class UserResponse
+{
+    public function __construct(
+        public int $id,
+        public string $firstName,
+        public int $authorId,
+    ) {}
+}
+```
+
+```json
+{
+    "id": 1,
+    "first_name": "John",
+    "author_id": 42
+}
+```
+
+Available values: `'snake_case'`, `'pascal_case'`, and `'kebab_case'`. `#[SerializeAs]` always takes precedence over the case setting for any specific field.
+
+---
+
+## Putting It All Together
+
+```php
+use Antares\Serialization\Attributes\ResponseDto;
+use Antares\Serialization\Attributes\Hide;
+use Antares\Serialization\Attributes\SerializeAs;
+use Antares\Serialization\Attributes\Computed;
+
+#[ResponseDto(case: 'snake_case')]
+readonly class ArticleResponse
+{
+    public function __construct(
+        public int $id,
+        public string $title,
+        public string $body,
+        public string $status,
+
+        #[SerializeAs('author_id')]
+        public int $userId,
+
+        #[Hide]
+        public string $internalNotes,
+
+        #[SerializeAs('created')]
+        public string $createdAt,
+    ) {}
+
+    #[Computed]
+    public function excerpt(): string
+    {
+        return mb_strimwidth($this->body, 0, 120, '...');
+    }
+}
+```
+
+```json
+{
+    "id": 1,
+    "title": "Hello World",
+    "body": "Full article body here...",
+    "status": "published",
+    "author_id": 42,
+    "created": "2024-01-15 10:30:00",
+    "excerpt": "Full article body here..."
+}
+```
+
+`internalNotes` is hidden. `userId` is renamed to `author_id` via `#[SerializeAs]`. `createdAt` is renamed to `created` via `#[SerializeAs]`. `excerpt` is computed on the fly.

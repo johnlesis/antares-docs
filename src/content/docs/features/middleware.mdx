@@ -1,0 +1,79 @@
+---
+title: Middleware & Pipeline
+description: Global middleware and request pipeline
+---
+
+Middleware wraps the Dispatcher in layers. Each middleware receives the request, can modify it or short-circuit the pipeline, calls `$next`, and can modify the response on the way out.
+
+## Writing Middleware
+
+Implement `Antares\Middleware\MiddlewareInterface`:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Middleware;
+
+use Antares\Middleware\MiddlewareInterface;
+use Nyholm\Psr7\Response;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+
+final class CorsMiddleware implements MiddlewareInterface
+{
+    private array $config;
+
+    public function __construct()
+    {
+        $this->config = require __DIR__ . '/../../config/cors.php';
+    }
+
+    public function handle(ServerRequestInterface $request, callable $next): ResponseInterface
+    {
+        if ($request->getMethod() === 'OPTIONS') {
+            return new Response(204, [
+                'Access-Control-Allow-Origin'      => $this->config['origin'],
+                'Access-Control-Allow-Methods'     => $this->config['methods'],
+                'Access-Control-Allow-Headers'     => $this->config['headers'],
+                'Access-Control-Max-Age'           => $this->config['max_age'],
+                'Access-Control-Allow-Credentials' => $this->config['credentials'] ? 'true' : 'false',
+            ]);
+        }
+
+        $response = $next($request);
+
+        return $response
+            ->withHeader('Access-Control-Allow-Origin', $this->config['origin'])
+            ->withHeader('Access-Control-Allow-Methods', $this->config['methods'])
+            ->withHeader('Access-Control-Allow-Headers', $this->config['headers'])
+            ->withHeader('Access-Control-Expose-Headers', $this->config['exposed_headers'])
+            ->withHeader('Access-Control-Allow-Credentials', $this->config['credentials'] ? 'true' : 'false');
+    }
+}
+```
+
+## Registering Middleware
+
+Pass middleware classes to `->middleware([...])` on the application. They run in the order given — the first item is the outermost layer:
+
+```php
+Application::create(__DIR__ . '/..')
+    ->middleware([
+        CorsMiddleware::class,
+        RateLimitMiddleware::class,
+        LogMiddleware::class,
+    ])
+    ->run();
+```
+
+## Pipeline Internals
+
+The `Pipeline` wraps middleware around the Dispatcher using a recursive closure. The Dispatcher is always the innermost destination — middleware cannot bypass error handling, which wraps the entire pipeline.
+
+```
+Request → CorsMiddleware → RateLimitMiddleware → LogMiddleware → Dispatcher
+                                                                    ↕
+Response ← CorsMiddleware ← RateLimitMiddleware ← LogMiddleware ← Dispatcher
+```

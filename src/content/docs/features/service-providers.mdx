@@ -1,0 +1,123 @@
+---
+title: Service Providers
+description: Register container bindings and route controllers
+---
+
+Service providers are the only place where you configure the container and register routes. Every provider implements the `Antares\ServiceProvider` interface:
+
+```php
+interface ServiceProvider
+{
+    public function register(Container $container): void;
+}
+```
+
+## Container Bindings
+
+Use providers to bind interfaces to concrete implementations and register singletons for classes that need primitive constructor arguments (like values from `.env`)
+
+scoped works like singleton but the instance is cleared after each request. Use it for classes that should not persist state across requests when running in worker mode (Swoole, FrankenPHP):
+
+In PHP-FPM the distinction does not matter since the process dies after every request anyway.
+```php
+use Antares\ServiceProvider;
+use Antares\Container\Container;
+
+class AppServiceProvider implements ServiceProvider
+{
+    public function register(Container $container): void
+    {
+        $container->bind(LoggerInterface::class, FileLogger::class);
+
+        $container->singleton(Mailer::class, fn() => new Mailer(
+            host: $_ENV['MAIL_HOST'],
+            port: (int) $_ENV['MAIL_PORT'],
+            secret: $_ENV['MAIL_SECRET'],
+        ));
+
+        $container->singleton(Database::class, fn() => new Database(
+            dsn: "mysql:host={$_ENV['DB_HOST']};dbname={$_ENV['DB_DATABASE']}",
+            username: $_ENV['DB_USERNAME'],
+            password: $_ENV['DB_PASSWORD'],
+        ));
+
+        $container->scoped(RequestContext::class, fn() => new RequestContext());
+    }
+}
+```
+
+## Route Providers
+
+Route providers call $router->register() with each of your controller classes. The router inspects the class via reflection and registers all methods annotated with route attributes:
+```php
+use Antares\ServiceProvider;
+use Antares\Container\Container;
+use Antares\Router\Router;
+
+class RouteServiceProvider implements ServiceProvider
+{
+    public function register(Container $container): void
+    {
+        $router = $container->make(Router::class);
+
+        $router->register(UserController::class);
+        $router->register(PostController::class);
+        $router->register(AuthController::class);
+    }
+}
+```
+
+#### Array Config
+
+Alternatively, define routes in config/routes.php and load them with registerFromConfig():
+```php
+
+config/routes.php
+return [
+    ['GET',    '/users',      UserController::class, 'index',   200],
+    ['POST',   '/users',      UserController::class, 'store',   201],
+    ['GET',    '/users/{id}', UserController::class, 'show',    200],
+    ['PUT',    '/users/{id}', UserController::class, 'update',  200],
+    ['DELETE', '/users/{id}', UserController::class, 'destroy', 204],
+];
+```
+```php
+$router->registerFromConfig(require __DIR__ . '/../config/routes.php');
+```
+
+#### YAML Config
+Supported via symfony/yaml:
+```bash
+composer require symfony/yaml
+```
+```yaml# config/routes.yaml
+routes:
+  - method: GET
+    path: /users
+    controller: App\Controllers\UserController
+    action: index
+    status: 200
+  - method: POST
+    path: /users
+    controller: App\Controllers\UserController
+    action: store
+    status: 201
+```
+
+```php
+$router->registerFromYaml(__DIR__ . '/../config/routes.yaml');
+```
+
+## Bridge Auto-Discovery
+
+Bridge packages declare their providers in `composer.json` and are registered automatically — you do not need to add them to `->providers([...])`:
+
+```json
+"extra": {
+    "antares": {
+        "providers": [
+            "Antares\\Monolog\\MonologServiceProvider"
+        ]
+    }
+}
+```

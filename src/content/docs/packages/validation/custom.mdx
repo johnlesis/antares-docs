@@ -1,0 +1,67 @@
+---
+title: Custom Rules
+description: Writing your own validation attributes
+---
+
+Implement `Antares\Validation\Attributes\ValidationAttribute` to create a custom rule:
+
+```php
+use Antares\Validation\Attributes\ValidationAttribute;
+use Attribute;
+
+#[Attribute(Attribute::TARGET_PARAMETER)]
+final class Slug implements ValidationAttribute
+{
+    public function validate(mixed $value): ?string
+    {
+        if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', (string) $value)) {
+            return 'Must be a valid slug.';
+        }
+
+        return null;
+    }
+}
+```
+
+Return a string error message if validation fails, `null` if it passes. Then use it like any built-in attribute:
+
+```php
+#[Dto]
+readonly class CreatePostRequest
+{
+    public function __construct(
+        #[NotBlank]
+        public string $title,
+
+        #[NotBlank]
+        #[Slug]
+        public string $slug,
+    ) {}
+}
+```
+
+## Parameterised Rules
+
+Custom attributes can accept constructor arguments:
+
+```php
+#[Attribute(Attribute::TARGET_PARAMETER)]
+final class StartsWith implements ValidationAttribute
+{
+    public function __construct(private readonly string $prefix) {}
+
+    public function validate(mixed $value): ?string
+    {
+        if (!str_starts_with((string) $value, $this->prefix)) {
+            return "Must start with \"{$this->prefix}\".";
+        }
+
+        return null;
+    }
+}
+```
+
+```php
+#[StartsWith('SKU-')]
+public string $sku,
+```

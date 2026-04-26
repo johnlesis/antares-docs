@@ -1,0 +1,35 @@
+---
+title: Validation Overview
+description: DTO hydration and attribute-driven validation
+---
+
+`antares-validation` provides two things: a **Hydrator** that maps raw arrays to readonly PHP DTOs, and a **Validator** that checks those DTOs against PHP attributes. All errors are collected before throwing — you always get the full error list, not just the first failure.
+
+```bash
+composer require fatjon-lleshi/antares-validation
+```
+
+This package has no dependency on the Antares framework core and can be used in any PHP 8.2+ project.
+
+## How It Works
+
+1. Annotate a readonly class with `#[Dto]` and add validation attributes to its constructor parameters.
+2. Pass raw data (from a request body, form post, etc.) to `$hydrator->hydrate()`.
+3. If hydration succeeds, a fully typed DTO is returned. If validation fails, a `ValidationException` is thrown with a map of all field errors.
+
+```php
+use Antares\Hydration\Hydrator;
+use Antares\Validation\Validator;
+
+$hydrator = new Hydrator(new Validator());
+
+try {
+    $dto = $hydrator->hydrate(CreateUserRequest::class, $rawData);
+} catch (ValidationException $e) {
+    $e->getErrors(); // ['email' => ['Must be a valid email address']]
+} catch (HydrationException $e) {
+    // raw data could not be mapped to the DTO shape
+}
+```
+
+In the framework, the Dispatcher handles this automatically for any parameter typed as a `#[Dto]` class.

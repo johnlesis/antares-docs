@@ -1,0 +1,36 @@
+---
+title: Welcome to Antares
+description: Lightweight API-focused PHP framework for PHP 8.2+
+---
+
+# Antares Framework
+
+A modern, lightweight PHP framework designed for building fast and scalable APIs.
+
+## Get Started
+
+- [Introduction](/getting-started/introduction/)
+- [Installation](/getting-started/installation/)
+- [Quick Start](/getting-started/quick-start/)
+
+## Features
+
+- **Dependency Injection** - Powerful autowiring container with constructor injection, singletons, and contextual bindings.
+- **Attribute Routing** - Define routes using PHP 8 attributes directly on controller methods.
+- **Validation & DTOs** - Type-safe request validation with automatic DTO hydration.
+- **PSR Compliant** - Built on PSR-7 HTTP messages and PSR-15 middleware.
+
+## Quick Example
+
+```php
+use Antares\Router\Attributes\Get;
+
+class UserController
+{
+    #[Get('/users/{id}')]
+    public function show(int $id): array
+    {
+        return ['id' => $id, 'name' => 'John'];
+    }
+}
+```

@@ -1,0 +1,40 @@
+---
+title: CLI
+description: Antares command-line tools
+---
+
+Antares ships with a small CLI at `bin/antares` for scaffolding, migrations, and cache management.
+
+## Generator Commands
+
+```bash
+php bin/antares make:controller UserController
+php bin/antares make:dto CreateUserRequest
+php bin/antares make:response UserResponse
+php bin/antares make:middleware AuthMiddleware
+php bin/antares make:guard JwtGuard
+php bin/antares make:migration create_users_table
+```
+
+Each command creates a file in the appropriate subdirectory with the correct namespace, imports, and stub implementation.
+
+## Migration Commands
+
+```bash
+php bin/antares migrate
+php bin/antares migrate:rollback
+```
+
+`migrate` runs all pending migrations in `database/migrations/`. `migrate:rollback` rolls back the last batch in reverse order. See [Migrations](/features/migrations) for details.
+
+## Cache Commands
+
+```bash
+php bin/antares cache:clear
+```
+
+Deletes the compiled route cache (`storage/cache/routes.php`) and the fingerprint file (`storage/cache/fingerprint`). The cache is rebuilt on the next request.
+
+:::tip
+You do not need to run `cache:clear` after every deploy — the fingerprint-based invalidation handles that automatically when `composer.lock`, `.env`, or any file in `app/` changes.
+:::

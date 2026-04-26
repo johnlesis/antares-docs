@@ -1,0 +1,46 @@
+---
+title: Monolog Bridge
+description: PSR-3 logging via Monolog
+---
+
+The Monolog bridge binds `Psr\Log\LoggerInterface` in the container using [Monolog](https://github.com/Seldaek/monolog).
+
+```bash
+composer require fatjon-lleshi/antares-monolog-bridge
+```
+
+The bridge is auto-discovered — no manual registration needed.
+
+## Configuration
+
+Set these in your `.env`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_CHANNEL` | `file` | `file`, `stdout`, or `stderr` |
+| `LOG_LEVEL` | `debug` | Any PSR-3 level (`debug`, `info`, `warning`, `error`, …) |
+| `APP_NAME` | `antares` | Logger channel name |
+
+When `LOG_CHANNEL=file`, logs are written to `storage/logs/app.log` with daily rotation (30-day retention).
+
+## Usage
+
+Inject `LoggerInterface` anywhere in your application:
+
+```php
+use Psr\Log\LoggerInterface;
+
+class UserService
+{
+    public function __construct(
+        private readonly LoggerInterface $logger,
+    ) {}
+
+    public function create(CreateUserRequest $request): User
+    {
+        $user = User::create($request->toArray());
+        $this->logger->info('User created', ['id' => $user->id]);
+        return $user;
+    }
+}
+```

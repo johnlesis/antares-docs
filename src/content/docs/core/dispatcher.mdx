@@ -1,0 +1,76 @@
+---
+title: Dispatcher
+description: How Antares resolves controller method parameters and builds responses
+---
+
+The `Dispatcher` sits at the centre of every request. It matches the route, resolves all controller method parameters, invokes the method, and converts the return value into a PSR-7 response.
+
+## Parameter Resolution
+
+Parameters are resolved in priority order:
+
+| Condition | Resolution |
+|---|---|
+| Parameter has `#[Guards(GuardClass::class)]` | Guard is instantiated and `resolve($request)` is called |
+| Type is `ServerRequestInterface` | The raw PSR-7 request is injected |
+| Type is `UploadedFileInterface` | The uploaded file matching the parameter name is injected |
+| Name matches a route segment (`/users/{id}`) | Value is cast to `int`, `float`, `bool`, or `string` |
+| Type is a class annotated with `#[Dto]` | Body is decoded and hydrated+validated via the Hydrator |
+| Type is any other non-builtin class | Resolved via `$container->make()` |
+| Name matches a query parameter | Value is cast and injected |
+| Parameter has a default value | Default is used |
+
+## Response Building
+
+The return value of the controller method determines the response:
+
+| Return type | Response |
+|---|---|
+| `ResponseInterface` | Returned as-is |
+| `null` / `void` | Empty body with the route's status code |
+| `array` | JSON-encoded, `Content-Type: application/json` |
+| Object annotated with `#[ResponseDto]` | Serialized to array by the Serializer, then JSON-encoded |
+
+## Guards
+
+Guards let you authenticate or authorise a request and inject the resolved principal into the controller:
+
+```php
+use Antares\Http\Attributes\Guards;
+
+final class JwtGuard
+{
+    public function __construct(private readonly JwtService $jwt) {}
+
+    public function resolve(ServerRequestInterface $request): AuthUser
+    {
+        $token = ltrim($request->getHeaderLine('Authorization'), 'Bearer ');
+        return $this->jwt->decode($token) ?? throw new HttpException(401, 'Unauthorized');
+    }
+}
+```
+
+```php
+#[Post('/posts', 201)]
+public function store(
+    #[Guards(JwtGuard::class)] AuthUser $user,
+    CreatePostRequest $request,
+): PostResponse {
+    // $user is the decoded JWT principal
+}
+```
+
+The guard runs before any other parameter is resolved. If it throws, the request is rejected immediately.
+
+## ResponseBag
+
+Set response headers from anywhere in your application:
+
+```php
+use Antares\Http\ResponseBag;
+
+ResponseBag::header('X-Request-Id', uniqid());
+ResponseBag::header('X-Rate-Limit-Remaining', '99');
+```
+
+Headers are applied to the final response and cleared after each request.

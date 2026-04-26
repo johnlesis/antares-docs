@@ -1,0 +1,170 @@
+---
+title: Quick Start
+description: Build your first Antares API in minutes
+---
+
+## Entry Point for PHP-FPM runtime
+these are provided when creating project with:
+```bash
+composer create-project fatjon-lleshi/antares-app
+```
+
+##### index.php
+if you downloaded the app, public/index.php is already there.
+
+```php
+<?php
+
+use Antares\Application;
+use App\Providers\AppServiceProvider;
+use App\Providers\RouteServiceProvider;
+use App\Middleware\LogMiddleware;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+Application::create(__DIR__ . '/..')
+    ->providers([AppServiceProvider::class])
+    ->routeProviders([RouteServiceProvider::class])
+    ->middleware([CorsMiddleware::class])
+    ->run();
+```
+
+##### swoole.php 
+provides swoole runtime with workers (requires php swoole extension)
+
+```php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use App\Providers\AppServiceProvider;
+use App\Providers\RouteServiceProvider;
+use Antares\Application;
+
+Application::create(__DIR__)
+    ->providers([AppServiceProvider::class])
+    ->routeProviders([RouteServiceProvider::class])
+    ->runSwoole(
+        host: $_ENV['SWOOLE_HOST'] ?? '0.0.0.0',
+        port: (int) ($_ENV['SWOOLE_PORT'] ?? 8000),
+    );
+```
+run with:
+```bash
+php swoole.php
+```
+
+##### worker.php 
+provides FrankenPHP runtime with workers
+
+```php
+<?php
+
+declare(strict_types=1);
+
+require __DIR__ . '/vendor/autoload.php';
+
+use App\Providers\AppServiceProvider;
+use App\Providers\RouteServiceProvider;
+use Antares\Application;
+
+Application::create(__DIR__)
+    ->providers([AppServiceProvider::class])
+    ->routeProviders([RouteServiceProvider::class])
+    ->runWorker();
+```
+run with:
+```bash
+php worker.php
+```
+
+## Define a Controller
+
+Define routes with PHP attributes:
+
+```php
+use Antares\Router\Attributes\Get;
+use Antares\Router\Attributes\Post;
+
+class UserController
+{
+    #[Get('/users')]
+    public function index(): array
+    {
+        return ['users' => []];
+    }
+
+    #[Post('/users', 201)]
+    public function store(CreateUserRequest $request): UserResponse
+    {
+        return new UserResponse(id: 1, name: $request->name);
+    }
+}
+```
+
+## Register your Controller
+
+Define routes with PHP attributes:
+
+```php
+<?php
+use Antares\ServiceProvider;
+use Antares\Container\Container;
+use Antares\Router\Router;
+
+class RouteServiceProvider implements ServiceProvider
+{
+    public function register(Container $container): void
+    {
+        $router = $container->make(Router::class);
+
+        $router->register(UserController::class);
+    }
+}
+```
+
+## Request DTO
+Define a readonly class with Attribute #[Dto] and parameter constructor promotion
+
+```php
+use Antares\Validation\Attributes\Dto;
+use Antares\Validation\Attributes\NotBlank;
+use Antares\Validation\Attributes\Email;
+use Antares\Validation\Attributes\MinLength;
+
+#[Dto]
+readonly class CreateUserRequest
+{
+    public function __construct(
+        #[NotBlank]
+        #[MinLength(2)]
+        public string $name,
+
+        #[NotBlank]
+        #[Email]
+        public string $email,
+    ) {}
+}
+```
+
+## Response DTO
+Define a readonly class with Attribute #[ResponseDto] and parameter constructor promotion
+
+```php
+use Antares\Serialization\Attributes\ResponseDto;
+use Antares\Serialization\Attributes\SerializeAs;
+
+#[ResponseDto]
+readonly class UserResponse
+{
+    public function __construct(
+        public int $id,
+        public string $name,
+    ) {}
+}
+```
+
+That's all it takes. Antares wires up validation, serialization, and OpenAPI Doc generation automatically from these classes.
+You define the contract once, everything else just makes it itself.

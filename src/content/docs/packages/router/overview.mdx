@@ -1,0 +1,28 @@
+---
+title: Router Overview
+description: Attribute-based routing on top of nikic/fast-route
+---
+
+`antares-router` provides PHP attribute-based routing built on top of `nikic/fast-route`. It can be used standalone or as part of the Antares framework.
+
+```bash
+composer require fatjon-lleshi/antares-router
+```
+
+## Features
+
+- Route definition via PHP attributes (`#[Get]`, `#[Post]`, `#[Put]`, `#[Patch]`, `#[Delete]`)
+- Custom HTTP status codes per route
+- Route parameter extraction
+- Route caching for production
+- Config-based routing (array or YAML) as an alternative to attributes
+
+## Available Attributes
+
+| Attribute | HTTP Method |
+|---|---|
+| `#[Get]` | GET |
+| `#[Post]` | POST |
+| `#[Put]` | PUT |
+| `#[Patch]` | PATCH |
+| `#[Delete]` | DELETE |

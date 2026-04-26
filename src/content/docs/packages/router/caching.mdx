@@ -1,0 +1,30 @@
+---
+title: Route Caching
+description: Cache compiled routes for production
+---
+
+Reflecting over controller classes on every request adds overhead. Route caching compiles the route map once and stores it as a plain PHP file.
+
+## Manual Caching
+
+```php
+$cachePath = __DIR__ . '/../storage/cache/routes.php';
+
+if (file_exists($cachePath)) {
+    $router->loadFromCache($cachePath);
+} else {
+    $router->register(UserController::class);
+    $router->register(PostController::class);
+    $router->saveToCache($cachePath);
+}
+```
+
+## Automatic Caching (Framework)
+
+When using the full Antares framework, caching is handled automatically. Set `APP_ENV=production` in your `.env` and the cache is built on first request and invalidated whenever `composer.lock`, `.env`, or any file under `app/` changes.
+
+Clear the cache manually:
+
+```bash
+php bin/antares cache:clear
+```

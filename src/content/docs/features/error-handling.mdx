@@ -1,0 +1,49 @@
+---
+title: Error Handling
+description: Automatic exception-to-HTTP-response mapping
+---
+
+All exceptions are caught by the `ErrorHandler` and converted to [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807) Problem Detail JSON responses.
+
+## Mapping
+
+| Exception | Status code |
+|---|---|
+| `ValidationException` | `422 Unprocessable Entity` |
+| `HydrationException` | `400 Bad Request` |
+| `HttpException($code, $message)` | `$code` |
+| Any other `Throwable` | `500 Internal Server Error` |
+
+## Throwing HTTP Errors
+
+Use `HttpException` anywhere in your application — controllers, guards, middleware, services:
+
+```php
+use Antares\Exceptions\HttpException;
+
+throw new HttpException(403, 'Forbidden');
+throw new HttpException(404, 'User not found');
+throw new HttpException(409, 'Email already in use');
+```
+
+## Response Shape
+
+Every error response follows RFC 7807:
+
+```json
+{
+    "type": "https://antares.dev/errors",
+    "title": "Validation failed",
+    "status": 422,
+    "errors": {
+        "email": ["Must be a valid email address"],
+        "name": ["Must be at least 2 characters"]
+    }
+}
+```
+
+Validation errors include a field-level `errors` map. Other errors include only `type`, `title`, and `status`.
+
+## Production vs Development
+
+When `APP_ENV=production`, `500` responses do not leak exception messages or stack traces. In local/development mode, the full exception message is included in the `title` field.

@@ -1,0 +1,28 @@
+---
+title: Boot Sequence
+description: What happens when Antares boots
+---
+
+When `Application::run()` or `Application::boot()` is called, the following steps execute in order:
+
+1. **Load `.env`** — `vlucas/phpdotenv` loads environment variables from your project root. Missing variables do not throw; they simply remain unset.
+
+2. **Create Container** — A fresh `Container` instance is created. `Router` and `Generator` (OpenAPI) are registered as singletons immediately.
+
+3. **Auto-discover bridge providers** — Antares reads `vendor/composer/installed.json` and collects any `extra.antares.providers` entries from installed packages. Bridge providers (Monolog, Eloquent) are registered this way — no manual registration required.
+
+4. **Register service providers** — Each class passed to `->providers([...])` is instantiated and its `register()` method is called with the container.
+
+5. **Register route providers (or load cache)** — In production (`APP_ENV=production`) with a valid cache fingerprint, the compiled route cache is loaded directly. Otherwise, each route provider's `register()` is called and the OpenAPI controller is added automatically.
+
+6. **Wire Dispatcher, ErrorHandler, Pipeline** — The Dispatcher, ErrorHandler, and Pipeline are created and stored on the application instance, ready to handle requests.
+
+## Cache Fingerprint
+
+The route cache fingerprint is computed from:
+
+- `composer.lock`
+- `.env`
+- All files under `app/`
+
+If any of these change, the fingerprint changes and the cache is invalidated automatically on the next request.

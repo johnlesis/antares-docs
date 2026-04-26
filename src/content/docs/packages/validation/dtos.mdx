@@ -1,0 +1,83 @@
+---
+title: DTOs & Hydration
+description: Defining request DTOs and hydrating them from raw data
+---
+
+## Defining a DTO
+
+Annotate a readonly class with `#[Dto]` and declare constructor parameters with validation attributes:
+
+```php
+use Antares\Validation\Attributes\Dto;
+use Antares\Validation\Attributes\NotBlank;
+use Antares\Validation\Attributes\Email;
+use Antares\Validation\Attributes\MinLength;
+use Antares\Validation\Attributes\In;
+
+#[Dto]
+readonly class CreateUserRequest
+{
+    public function __construct(
+        #[NotBlank]
+        #[MinLength(2)]
+        public string $name,
+
+        #[NotBlank]
+        #[Email]
+        public string $email,
+
+        #[In(['admin', 'editor', 'viewer'])]
+        public string $role = 'viewer',
+    ) {}
+}
+```
+
+## Hydrating
+
+```php
+$data = ['name' => 'John', 'email' => 'john@example.com'];
+$dto = $hydrator->hydrate(CreateUserRequest::class, $data);
+
+$dto->name;  // 'John'
+$dto->email; // 'john@example.com'
+$dto->role;  // 'viewer' (default)
+```
+
+## Strict Mode
+
+Add `#[Strict]` to enable strict type checking during hydration. Without it, the hydrator coerces compatible types (e.g. `"42"` → `42`). With it, a type mismatch throws a `HydrationException`:
+
+```php
+#[Dto]
+#[Strict]
+readonly class StrictRequest
+{
+    public function __construct(
+        public int $count,
+    ) {}
+}
+```
+
+## Nested DTOs
+
+DTOs can contain other `#[Dto]` classes as nested properties. The hydrator recurses into them automatically:
+
+```php
+#[Dto]
+readonly class AddressRequest
+{
+    public function __construct(
+        #[NotBlank] public string $street,
+        #[NotBlank] public string $city,
+    ) {}
+}
+
+#[Dto]
+readonly class CreateOrderRequest
+{
+    public function __construct(
+        #[NotBlank] public string $sku,
+        public AddressRequest $address,
+    ) {}
+}
+```

@@ -1,0 +1,188 @@
+---
+title: Controllers
+description: Defining routes, resolving parameters, and returning responses
+---
+
+Controllers are plain PHP classes. You define routes by placing attributes on methods — no base class, no interface required.
+
+```php
+use Antares\Router\Attributes\Get;
+
+class UserController
+{
+    #[Get('/users')]
+    public function index(): array
+    {
+        return ['users' => []];
+    }
+}
+```
+
+Register the controller in your `RouteServiceProvider`:
+
+```php
+$router->register(UserController::class);
+```
+
+That's all. The router scans the class via reflection and picks up every annotated method.
+
+---
+
+## Route Parameters
+
+Segments wrapped in `{}` are extracted and injected by name. The value is cast to whatever type you declare:
+
+```php
+#[Get('/users/{id}')]
+public function show(int $id): array
+{
+    return ['id' => $id];
+}
+```
+
+Supported types: `int`, `float`, `bool`, `string`.
+
+---
+
+## Query Parameters
+
+Any scalar parameter that isn't a route segment is resolved from the query string:
+
+```php
+#[Get('/users')]
+public function index(int $page = 1, int $perPage = 15): array
+{
+    return ['page' => $page, 'perPage' => $perPage];
+}
+```
+
+`GET /users?page=2&perPage=50` injects `$page = 2` and `$perPage = 50`.
+
+---
+
+## Request Body
+
+Type-hint a `#[Dto]` class to have the request body decoded, hydrated, and validated automatically. If validation fails, a `422` response is returned before your method is ever called:
+
+```php
+#[Post('/users', 201)]
+public function store(CreateUserRequest $request): UserResponse
+{
+    return new UserResponse(id: 1, name: $request->name);
+}
+```
+
+See [DTOs](/features/dtos) for how to define request DTOs.
+
+---
+
+## Raw Request
+
+Type-hint `ServerRequestInterface` to get the raw PSR-7 request:
+
+```php
+use Psr\Http\Message\ServerRequestInterface;
+
+#[Get('/debug')]
+public function debug(ServerRequestInterface $request): array
+{
+    return ['method' => $request->getMethod()];
+}
+```
+
+---
+
+## File Uploads
+
+Type-hint `UploadedFileInterface` and name the parameter to match the form field:
+
+```php
+use Psr\Http\Message\UploadedFileInterface;
+
+#[Post('/avatars', 201)]
+public function upload(UploadedFileInterface $avatar): array
+{
+    $avatar->moveTo('/storage/avatars/' . uniqid() . '.jpg');
+    return ['uploaded' => true];
+}
+```
+
+---
+
+## Responses
+
+The return value of your method determines the response:
+
+| Return type | Result |
+|---|---|
+| `array` | JSON response with the route's status code |
+| `#[ResponseDto]` object | Serialized to JSON via the Serializer |
+| `ResponseInterface` | Returned as-is |
+| `null` / `void` | Empty body with the route's status code |
+
+### Array
+
+```php
+#[Get('/ping')]
+public function ping(): array
+{
+    return ['pong' => true];
+}
+```
+
+### Response DTO
+
+```php
+#[Get('/users/{id}')]
+public function show(int $id): UserResponse
+{
+    return new UserResponse(id: $id, name: 'John');
+}
+```
+
+See [Response DTOs](/features/response-dtos) for how to define and shape serialized responses.
+
+### No content
+
+```php
+#[Delete('/users/{id}', 204)]
+public function destroy(int $id): void
+{
+    // 204 No Content
+}
+```
+
+### Raw response
+
+```php
+use Nyholm\Psr7\Response;
+
+#[Get('/health')]
+public function health(): Response
+{
+    return new Response(200, [], 'OK');
+}
+```
+
+---
+
+## Container Dependencies
+
+Any non-builtin type that isn't a DTO, guard, or PSR type is resolved from the container. This is how you inject services:
+
+```php
+class PostController
+{
+    public function __construct(
+        private readonly PostRepository $posts,
+    ) {}
+
+    #[Get('/posts')]
+    public function index(): array
+    {
+        return $this->posts->all();
+    }
+}
+```
+
+The container autowires `PostRepository` and any of its own dependencies automatically.

@@ -1,0 +1,68 @@
+---
+title: Route Attributes
+description: Defining routes with PHP attributes
+---
+
+Routes are defined by placing attributes on controller methods. The router discovers them via reflection when you call `$router->register(ControllerClass::class)`.
+
+## Basic Routes
+
+```php
+use Antares\Router\Attributes\Get;
+use Antares\Router\Attributes\Post;
+use Antares\Router\Attributes\Put;
+use Antares\Router\Attributes\Patch;
+use Antares\Router\Attributes\Delete;
+
+class UserController
+{
+    #[Get('/users')]
+    public function index(): array { /* ... */ }
+
+    #[Get('/users/{id}')]
+    public function show(int $id): array { /* ... */ }
+
+    #[Post('/users', 201)]
+    public function store(CreateUserRequest $request): UserResponse { /* ... */ }
+
+    #[Put('/users/{id}')]
+    public function update(int $id, UpdateUserRequest $request): UserResponse { /* ... */ }
+
+    #[Patch('/users/{id}')]
+    public function patch(int $id, PatchUserRequest $request): UserResponse { /* ... */ }
+
+    #[Delete('/users/{id}', 204)]
+    public function destroy(int $id): void { /* ... */ }
+}
+```
+
+## Custom Status Codes
+
+The second argument to any route attribute sets the success status code. It defaults to `200`:
+
+```php
+#[Post('/users', 201)]
+public function store(): UserResponse { /* ... */ }
+
+#[Delete('/users/{id}', 204)]
+public function destroy(int $id): void { /* ... */ }
+```
+
+## Route Parameters
+
+Segments wrapped in `{}` are route parameters. They are extracted and injected into the controller method by name, cast to the declared type:
+
+```php
+#[Get('/posts/{postId}/comments/{commentId}')]
+public function show(int $postId, int $commentId): array { /* ... */ }
+```
+
+Supported cast targets: `int`, `float`, `bool`, `string`.
+
+## Registering Controllers
+
+```php
+$router = new Router();
+$router->register(UserController::class);
+$router->register(PostController::class);
+```

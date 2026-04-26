@@ -1,0 +1,58 @@
+---
+title: Autowiring
+description: Automatic constructor injection via reflection
+---
+
+The container resolves classes and their entire dependency tree automatically — no configuration needed for concrete classes.
+
+## Basic Resolution
+
+```php
+use Antares\Container\Container;
+
+class Logger {}
+
+class UserService
+{
+    public function __construct(
+        private readonly Logger $logger,
+    ) {}
+}
+
+$container = new Container();
+$service = $container->make(UserService::class);
+```
+
+## Nested Dependencies
+
+The container walks the full constructor tree recursively:
+
+```php
+class Cache {}
+
+class Repository
+{
+    public function __construct(
+        private readonly Database $db,
+        private readonly Cache $cache,
+    ) {}
+}
+
+$repository = $container->make(Repository::class);
+```
+
+Both `Database` and `Cache` are resolved and injected automatically.
+
+## Default Parameter Values
+
+Parameters with default values are respected — if the container cannot resolve a type, it falls back to the default:
+
+```php
+class Paginator
+{
+    public function __construct(
+        private readonly Database $db,
+        private readonly int $perPage = 15,
+    ) {}
+}
+```

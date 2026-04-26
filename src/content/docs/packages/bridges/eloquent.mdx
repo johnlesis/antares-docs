@@ -1,0 +1,64 @@
+---
+title: Eloquent Bridge
+description: Eloquent ORM integration via Laravel's database capsule
+---
+
+The Eloquent bridge wires up Laravel's Eloquent ORM using `Illuminate\Database\Capsule\Manager`.
+
+```bash
+composer require fatjon-lleshi/antares-eloquent-bridge
+```
+
+The bridge is auto-discovered — no manual registration needed.
+
+## Configuration
+
+Set these in your `.env`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `DB_DRIVER` | `mysql` | Database driver (`mysql`, `pgsql`, `sqlite`) |
+| `DB_HOST` | `127.0.0.1` | Database host |
+| `DB_PORT` | `3306` | Database port |
+| `DB_DATABASE` | `` | Database name |
+| `DB_USERNAME` | `` | Database user |
+| `DB_PASSWORD` | `` | Database password |
+| `DB_CHARSET` | `utf8mb4` | Connection charset |
+| `DB_COLLATION` | `utf8mb4_unicode_ci` | Connection collation |
+| `DB_PREFIX` | `` | Table prefix |
+
+## Usage
+
+Define models as you would in any Laravel application:
+
+```php
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected $fillable = ['name', 'email'];
+}
+```
+
+Inject `Capsule` or `DatabaseManager` via the container:
+
+```php
+use Illuminate\Database\Capsule\Manager as Capsule;
+
+class UserRepository
+{
+    public function __construct(
+        private readonly Capsule $capsule,
+    ) {}
+
+    public function all(): array
+    {
+        return User::all()->toArray();
+    }
+
+    public function find(int $id): ?User
+    {
+        return User::find($id);
+    }
+}
+```

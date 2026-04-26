@@ -1,0 +1,74 @@
+---
+title: Application
+description: The Application class and its fluent boot API
+---
+
+`Antares\Application` is the entry point for every Antares app. It exposes a fluent API for wiring up providers, middleware, and the route layer before calling `run()`.
+
+## API
+
+```php
+Application::create(string $basePath): self
+```
+
+Creates the application instance. `$basePath` should be the root of your project (the directory that contains `composer.json`, `.env`, and `storage/`).
+
+```php
+->providers(array $providers): static
+```
+
+Registers service providers. These run before route providers and are used for container bindings and singletons.
+
+```php
+->routeProviders(array $providers): static
+```
+
+Registers route providers. These are responsible for calling `$router->register()` with your controller classes.
+
+```php
+->middleware(array $middleware): static
+```
+
+Registers global middleware. Middleware runs in order on every request, wrapping the Dispatcher as the innermost layer.
+
+```php
+->run(): void
+```
+
+Boots the application, creates a PSR-7 `ServerRequest` from PHP globals, runs the pipeline, and emits the response.
+
+## Full Example
+
+```php
+Application::create(__DIR__ . '/..')
+    ->providers([
+        AppServiceProvider::class,
+        DatabaseServiceProvider::class,
+    ])
+    ->routeProviders([
+        RouteServiceProvider::class,
+    ])
+    ->middleware([
+        CorsMiddleware::class,
+        AuthMiddleware::class,
+        LogMiddleware::class,
+    ])
+    ->run();
+```
+
+## Testing
+
+Use `boot()` + `handle()` to test without emitting output:
+
+```php
+$app = Application::create(__DIR__ . '/..')
+    ->providers([AppServiceProvider::class])
+    ->routeProviders([RouteServiceProvider::class]);
+
+$app->boot();
+
+$request = (new Psr17Factory())->createServerRequest('GET', '/users');
+$response = $app->handle($request);
+
+assert($response->getStatusCode() === 200);
+```

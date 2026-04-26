@@ -1,0 +1,62 @@
+---
+title: Error Handling
+description: ContainerException and what triggers it
+---
+
+All container errors throw `Antares\Container\ContainerException`.
+
+## Unbound Interface
+
+Trying to resolve an interface without a binding:
+
+```php
+try {
+    $container->make(LoggerInterface::class);
+} catch (ContainerException $e) {
+    echo $e->getMessage();
+    // Cannot instantiate LoggerInterface. Is it an interface or abstract class? Did you forget to bind it?
+}
+```
+
+Fix: call `$container->bind(LoggerInterface::class, ConcreteLogger::class)` in a service provider.
+
+## Circular Dependency
+
+```php
+class A {
+    public function __construct(public B $b) {}
+}
+class B {
+    public function __construct(public A $a) {}
+}
+
+$container->make(A::class);
+// ContainerException: Circular dependency detected: A
+```
+
+Fix: break the cycle by introducing an interface, a factory, or by making one dependency optional.
+
+## Unresolvable Primitive
+
+If a constructor has a primitive parameter (`string`, `int`, etc.) with no default value, the container cannot autowire it:
+
+```php
+class Mailer {
+    public function __construct(
+        public readonly string $host,
+        public readonly int $port,
+    ) {}
+}
+
+$container->make(Mailer::class);
+// ContainerException: Cannot resolve primitive parameter $host in Mailer.
+```
+
+Fix: register as a singleton with explicit values:
+
+```php
+$container->singleton(Mailer::class, fn() => new Mailer(
+    host: $_ENV['MAIL_HOST'],
+    port: (int) $_ENV['MAIL_PORT'],
+));
+```
