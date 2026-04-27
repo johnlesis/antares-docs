@@ -185,6 +185,6 @@ Resolvers can have constructor dependencies — the container autowires them jus
 | | `#[Guards]` | `#[Inject]` |
 |---|---|---|
 | Interface | `Guard` | `Resolver` |
-| Purpose | Auth / access control | Data extraction |
-| Throws | `HttpException` to reject | Should not throw |
-| Returns | Authenticated principal | Shaped request data |
+| Purpose | Auth / access control | Anything |
+| Throws | `HttpException` to reject | Up to you|
+| Returns | Authenticated principal | Whatever you need |
