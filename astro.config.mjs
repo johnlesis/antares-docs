@@ -32,7 +32,7 @@ export default defineConfig({
             { label: 'Controllers', slug: 'features/controllers' },
             { label: 'DTOs', slug: 'features/dtos' },
             { label: 'Response DTOs', slug: 'features/response-dtos' },
-            { label: 'Guards', slug: 'features/guards' },
+            { label: 'Guards & Resolvers', slug: 'features/guards' },
             { label: 'Migrations', slug: 'features/migrations' },
             { label: 'CLI', slug: 'features/cli' },
             { label: 'OpenAPI', slug: 'features/openapi' },

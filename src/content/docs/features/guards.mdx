@@ -1,21 +1,24 @@
 ---
-title: Guards
-description: Authenticate requests and inject the resolved principal into your controller
+title: Guards & Resolvers
+description: Authenticate requests, enforce access control, and inject typed values into your controller
 ---
 
 A guard authenticates an incoming request and returns a typed value — usually the authenticated user or tenant — which is then injected directly into your controller method. If the guard throws, the request is rejected before anything else runs.
+
+A resolver extracts and shapes request data into a typed value — query params, headers, or anything that isn't about authentication.
 
 ---
 
 ## Writing a Guard
 
-A guard is a plain class with a `resolve(ServerRequestInterface $request)` method. It can have constructor dependencies — the container autowires them:
+A guard implements the `Guard` interface. It can have constructor dependencies — the container autowires them:
 
 ```php
-use Psr\Http\Message\ServerRequestInterface;
+use Antares\Http\Guards\Guard;
 use Antares\Exceptions\HttpException;
+use Psr\Http\Message\ServerRequestInterface;
 
-final class JwtGuard
+final class JwtGuard implements Guard
 {
     public function __construct(
         private readonly JwtService $jwt,
@@ -25,8 +28,7 @@ final class JwtGuard
     {
         $header = $request->getHeaderLine('Authorization');
         $token  = ltrim($header, 'Bearer ');
-
-        $user = $this->jwt->decode($token);
+        $user   = $this->jwt->decode($token);
 
         if ($user === null) {
             throw new HttpException(401, 'Unauthorized');
@@ -92,7 +94,7 @@ Guards run in the order they appear in the parameter list.
 Guards are a natural place to enforce roles. Throw an `HttpException` with `403` if the resolved user does not have the required access:
 
 ```php
-final class AdminGuard
+final class AdminGuard implements Guard
 {
     public function __construct(
         private readonly JwtService $jwt,
@@ -132,3 +134,57 @@ public function destroy(
 ## Guards Are Request-Scoped
 
 Guards always receive the `ServerRequestInterface` and are designed to authenticate based on request data — headers, cookies, tokens. If you need logic that has nothing to do with the current request, that belongs in a plain service resolved by the container, not a guard.
+
+---
+
+## Resolvers
+
+A resolver extracts and shapes request data into a typed value — query params, headers, or anything that isn't about authentication. Unlike guards, resolvers never throw auth errors; they just parse and return.
+
+```php
+use Antares\Http\Resolvers\Resolver;
+use Psr\Http\Message\ServerRequestInterface;
+
+final class PaginationResolver implements Resolver
+{
+    public function resolve(ServerRequestInterface $request): Pagination
+    {
+        $params = $request->getQueryParams();
+
+        return new Pagination(
+            page: (int) ($params['page'] ?? 1),
+            perPage: (int) ($params['per_page'] ?? 15),
+        );
+    }
+}
+```
+
+Apply `#[Inject(ResolverClass::class)]` to the parameter:
+
+```php
+use Antares\Http\Attributes\Inject;
+
+class PostController
+{
+    #[Get('/posts')]
+    public function index(
+        #[Guards(JwtGuard::class)] AuthUser $user,
+        #[Inject(PaginationResolver::class)] Pagination $page,
+    ): array {
+        ...
+    }
+}
+```
+
+Resolvers can have constructor dependencies — the container autowires them just like guards.
+
+---
+
+## Guards vs Resolvers
+
+| | `#[Guards]` | `#[Inject]` |
+|---|---|---|
+| Interface | `Guard` | `Resolver` |
+| Purpose | Auth / access control | Data extraction |
+| Throws | `HttpException` to reject | Should not throw |
+| Returns | Authenticated principal | Shaped request data |
