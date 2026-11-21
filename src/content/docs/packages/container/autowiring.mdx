@@ -3,7 +3,7 @@ title: Autowiring
 description: Automatic constructor injection via reflection
 ---
 
-The container resolves classes and their entire dependency tree automatically — no configuration needed for concrete classes.
+The container resolves classes and their entire dependency tree automatically. Concrete classes need no configuration.
 
 ## Basic Resolution
 
@@ -22,6 +22,8 @@ class UserService
 $container = new Container();
 $service = $container->make(UserService::class);
 ```
+
+Autowired classes are **not shared**: every `make()` call builds a new instance, and so does every class that depends on it. Register a class with `singleton()` or `scoped()` when it should be shared. See [Bindings & Singletons](/packages/container/bindings/).
 
 ## Nested Dependencies
 
@@ -43,16 +45,25 @@ $repository = $container->make(Repository::class);
 
 Both `Database` and `Cache` are resolved and injected automatically.
 
-## Default Parameter Values
+## How Each Constructor Parameter Is Resolved
 
-Parameters with default values are respected — if the container cannot resolve a type, it falls back to the default:
+| Parameter | Resolved as |
+|---|---|
+| Class or interface type (`Database $db`) | `$container->make(Database::class)`, **always**, even if it has a default value |
+| Scalar or `array` type with a default (`int $perPage = 15`) | The default value |
+| No type, with a default | The default value |
+| Scalar without a default (`string $host`) | Error: register the class with `singleton()` and pass the value yourself |
 
 ```php
 class Paginator
 {
     public function __construct(
-        private readonly Database $db,
-        private readonly int $perPage = 15,
+        private readonly Database $db,      // resolved from the container
+        private readonly int $perPage = 15, // default used
     ) {}
 }
 ```
+
+:::caution
+A nullable class parameter with a default, such as `?LoggerInterface $logger = null`, is still resolved from the container. If `LoggerInterface` is not bound, `make()` throws instead of passing `null`.
+:::

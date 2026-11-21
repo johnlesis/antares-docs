@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightVersions from 'starlight-versions';
 
 export default defineConfig({
   integrations: [
@@ -7,6 +8,19 @@ export default defineConfig({
       title: 'Antares',
       description: 'Lightweight API-focused PHP framework for PHP 8.2+',
       head: [],
+      plugins: [
+        starlightVersions({
+          // The docs at the site root are the current version.
+          current: { label: 'v0.2 (latest)' },
+          // Archived versions, newest first. Adding a slug here snapshots the
+          // current docs into src/content/docs/<slug>/ on the next build.
+          versions: [{ slug: '0.1', label: 'v0.1' }],
+        }),
+      ],
+      components: {
+        SiteTitle: './src/components/SiteTitle.astro',
+        ThemeSelect: './src/components/ThemeSelect.astro',
+      },
       social: [
         {
           icon: 'github',
@@ -24,6 +38,7 @@ export default defineConfig({
             { label: 'Introduction', slug: 'getting-started/introduction' },
             { label: 'Installation', slug: 'getting-started/installation' },
             { label: 'Quick Start', slug: 'getting-started/quick-start' },
+            { label: 'Upgrading to 0.2', slug: 'getting-started/upgrading' },
           ],
         },
         {

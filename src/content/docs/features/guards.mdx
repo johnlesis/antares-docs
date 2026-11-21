@@ -11,10 +11,10 @@ A resolver extracts and shapes request data into a typed value — query params,
 
 ## Writing a Guard
 
-A guard implements the `Guard` interface. It can have constructor dependencies — the container autowires them:
+A guard implements `Antares\Http\ResolverInterfaces\Guard`. It is built by the container on every request, so it can have constructor dependencies:
 
 ```php
-use Antares\Http\Guards\Guard;
+use Antares\Http\ResolverInterfaces\Guard;
 use Antares\Exceptions\HttpException;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -27,7 +27,7 @@ final class JwtGuard implements Guard
     public function resolve(ServerRequestInterface $request): AuthUser
     {
         $header = $request->getHeaderLine('Authorization');
-        $token  = ltrim($header, 'Bearer ');
+        $token  = preg_replace('/^Bearer\s+/i', '', $header);
         $user   = $this->jwt->decode($token);
 
         if ($user === null) {
@@ -43,16 +43,16 @@ final class JwtGuard implements Guard
 
 ## Using a Guard
 
-Apply `#[Guards(GuardClass::class)]` to the parameter that should receive the resolved value:
+Apply `#[Guard(GuardClass::class)]` to the parameter that should receive the resolved value:
 
 ```php
-use Antares\Http\Attributes\Guards;
+use Antares\Http\Attributes\Guard;
 
 class PostController
 {
     #[Post('/posts', 201)]
     public function store(
-        #[Guards(JwtGuard::class)] AuthUser $user,
+        #[Guard(JwtGuard::class)] AuthUser $user,
         CreatePostRequest $request,
     ): PostResponse {
         return new PostResponse(
@@ -64,7 +64,9 @@ class PostController
 }
 ```
 
-The guard runs first. If it throws, the DTO is never hydrated and the controller method is never called.
+Parameters are resolved **in the order they are declared**. Put guard parameters first: then, if the guard throws, the request body is never hydrated and the controller method is never called.
+
+The attribute class `Antares\Http\Attributes\Guard` and the interface `Antares\Http\ResolverInterfaces\Guard` share a short name. If you need both in one file, alias one of them (`use Antares\Http\ResolverInterfaces\Guard as GuardContract;`).
 
 ---
 
@@ -77,15 +79,15 @@ class ReportController
 {
     #[Get('/reports')]
     public function index(
-        #[Guards(TenantGuard::class)] Tenant $tenant,
-        #[Guards(JwtGuard::class)] AuthUser $user,
+        #[Guard(TenantGuard::class)] Tenant $tenant,
+        #[Guard(JwtGuard::class)] AuthUser $user,
     ): array {
         return ['tenant' => $tenant->id, 'user' => $user->id];
     }
 }
 ```
 
-Guards run in the order they appear in the parameter list.
+Guards run in the order they appear in the parameter list, each as a separate call: two parameters with the same guard run it twice.
 
 ---
 
@@ -103,7 +105,7 @@ final class AdminGuard implements Guard
     public function resolve(ServerRequestInterface $request): AuthUser
     {
         $user = $this->jwt->decode(
-            ltrim($request->getHeaderLine('Authorization'), 'Bearer ')
+            preg_replace('/^Bearer\s+/i', '', $request->getHeaderLine('Authorization'))
         );
 
         if ($user === null) {
@@ -122,7 +124,7 @@ final class AdminGuard implements Guard
 ```php
 #[Delete('/users/{id}', 204)]
 public function destroy(
-    #[Guards(AdminGuard::class)] AuthUser $user,
+    #[Guard(AdminGuard::class)] AuthUser $user,
     int $id,
 ): void {
     // only admins reach here
@@ -142,7 +144,7 @@ Guards always receive the `ServerRequestInterface` and are designed to authentic
 A resolver extracts and shapes request data into a typed value — query params, headers, or anything that isn't about authentication. Unlike guards, resolvers never throw auth errors; they just parse and return.
 
 ```php
-use Antares\Http\Resolvers\Resolver;
+use Antares\Http\ResolverInterfaces\Resolver;
 use Psr\Http\Message\ServerRequestInterface;
 
 final class PaginationResolver implements Resolver
@@ -168,7 +170,7 @@ class PostController
 {
     #[Get('/posts')]
     public function index(
-        #[Guards(JwtGuard::class)] AuthUser $user,
+        #[Guard(JwtGuard::class)] AuthUser $user,
         #[Inject(PaginationResolver::class)] Pagination $page,
     ): array {
         ...
@@ -182,7 +184,7 @@ Resolvers can have constructor dependencies — the container autowires them jus
 
 ## Guards vs Resolvers
 
-| | `#[Guards]` | `#[Inject]` |
+| | `#[Guard]` | `#[Inject]` |
 |---|---|---|
 | Interface | `Guard` | `Resolver` |
 | Purpose | Auth / access control | Anything |

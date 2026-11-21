@@ -1,0 +1,77 @@
+---
+title: Upgrading to 0.2
+description: Breaking changes and how to update a 0.1 app
+---
+
+0.2 has one breaking code change and two changed defaults. Most apps upgrade in a few minutes.
+
+## 1. Update the packages
+
+All Antares packages share one version number, so update them together:
+
+```bash
+composer require fatjon-lleshi/antares:^0.2
+```
+
+`^0.1` constraints do not accept 0.2, because on `0.x` versions a minor bump is a breaking release. If you require any standalone package directly (`antares-container`, `antares-router`, `antares-validation`, or a bridge), bump it to `^0.2` as well.
+
+## 2. `ResponseDto(case:)` takes an enum
+
+The `case` argument of `#[ResponseDto]` is now a `CaseStyle` enum instead of a string.
+
+```php del={1} ins={2-5}
+#[ResponseDto(case: 'snake_case')]
+use Antares\Serialization\CaseStyle;
+
+#[ResponseDto(case: CaseStyle::SnakeCase)]
+```
+
+| 0.1 string | 0.2 enum |
+|---|---|
+| `'camel_case'` (default) | `CaseStyle::CamelCase` |
+| `'snake_case'` | `CaseStyle::SnakeCase` |
+| `'pascal_case'` | `CaseStyle::PascalCase` |
+| `'kebab_case'` | `CaseStyle::KebabCase` |
+
+A string now fails with a `TypeError` when the response is serialized, so search your app for `case: '` to find every place to change. Classes without a `case` argument need no changes.
+
+If you call `CaseConverter::convert()` directly, pass a `CaseStyle` there too.
+
+## 3. OpenAPI docs are off in production by default
+
+In 0.1, `/openapi.json` and `/docs` were registered in every environment. In 0.2 they are **off when `APP_ENV=production`**, so your production API no longer publishes its own map.
+
+To keep them on in production, add this to the server's `.env`:
+
+```env
+APP_DOCS=true
+```
+
+Nothing changes locally. See [OpenAPI](/features/openapi/#turning-the-docs-on-or-off) for every option.
+
+## 4. Unexpected errors are hidden in production
+
+In 0.1, every error response showed the exception's message, so a database error could reach your users. In 0.2, only errors meant for the client show their message: `HttpException`, validation and hydration errors, unknown routes, and anything you mark as safe. **Every other exception becomes `500 Internal Server Error`** with no details, and is logged.
+
+What to check:
+
+- If you throw plain exceptions (`RuntimeException`, `DomainException`, …) and rely on their message reaching the client, throw an `HttpException` instead, implement `HttpExceptionInterface`, or map them with `->exceptions([...])`. See [Error Handling](/features/error-handling/#showing-an-error-to-the-client).
+- Locally nothing is hidden: `APP_DEBUG` is on by default outside `APP_ENV=production`, and adds the real error to `500` responses.
+- Clients checking for a `500` on unknown routes now get `404` (or `405` for a wrong HTTP method).
+
+## Also new in 0.2
+
+These need no changes on your side:
+
+- **`404` and `405`** for unknown routes and wrong HTTP methods. In 0.1 both returned `500`.
+- **Error logging.** Every `5xx` is logged with the full exception, to the container's PSR-3 logger if there is one, otherwise to `error_log()`.
+- **Stricter request bodies.** Malformed input that used to cause a `500`, or was silently accepted, is now a `400` with a clear message: a JSON body that isn't an object, a string where a nested DTO is expected, an array for a `string` field, `null` for a non-nullable field, `?page[]=1` for a scalar query parameter, and several files under one field name.
+- **`bool` fields** now read `"false"`, `"no"` and `"off"` as `false`. In 0.1 they became `true`.
+- **FrankenPHP worker mode** keeps the app booted between requests. In 0.1, `runWorker()` handled one request per worker start.
+- **`#[DateTimeImmutable]`** can be used; in 0.1 it couldn't be autoloaded.
+- **`make:guard`** generates a guard that implements the right interface.
+
+- **Query parameters** are documented in the OpenAPI spec.
+- **`#[Computed]` fields** appear in response schemas.
+- A request body is detected by **`#[Dto]`**. In 0.1 it also required the class to be `readonly`.
+- A DTO **without a constructor** no longer breaks `/openapi.json`.

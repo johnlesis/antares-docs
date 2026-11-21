@@ -21,9 +21,18 @@ if (file_exists($cachePath)) {
 
 ## Automatic Caching (Framework)
 
-When using the full Antares framework, caching is handled automatically. Set `APP_ENV=production` in your `.env` and the cache is built on first request and invalidated whenever `composer.lock`, `.env`, or any file under `app/` changes.
+When using the full Antares framework, caching is handled automatically when `APP_ENV=production`:
 
-Clear the cache manually:
+- On boot, if `storage/cache/routes.php` exists and the fingerprint still matches, routes are loaded from the cache.
+- Otherwise the route providers run, and the result is written to the cache.
+
+The fingerprint is a hash of `composer.lock`, `.env`, and every file under `app/`, so changing any of them rebuilds the cache on the next boot.
+
+:::caution
+On a cache hit, **route providers are not run at all**. Only register routes in a route provider; put container bindings in a regular service provider, or they will be missing in production.
+:::
+
+Clear the cache manually (run from the project root):
 
 ```bash
 php bin/antares cache:clear

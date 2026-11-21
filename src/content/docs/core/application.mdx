@@ -11,31 +11,59 @@ description: The Application class and its fluent boot API
 Application::create(string $basePath): self
 ```
 
-Creates the application instance. `$basePath` should be the root of your project (the directory that contains `composer.json`, `.env`, and `storage/`).
+Creates the application instance. `$basePath` should be the root of your project (the directory that contains `composer.json`, `.env`, `vendor/`, `app/` and `storage/`). It is used to load `.env`, find bridge packages, store the route cache, and is available as `$_ENV['APP_BASE_PATH']`.
 
 ```php
 ->providers(array $providers): static
 ```
 
-Registers service providers. These run before route providers and are used for container bindings and singletons.
+Registers service providers. These run on every boot, before route providers, and are used for container bindings and singletons.
 
 ```php
 ->routeProviders(array $providers): static
 ```
 
-Registers route providers. These are responsible for calling `$router->register()` with your controller classes.
+Registers route providers. These are responsible for calling `$router->register()` with your controller classes. In production they are skipped when the route cache is valid, so only register routes here.
 
 ```php
 ->middleware(array $middleware): static
 ```
 
-Registers global middleware. Middleware runs in order on every request, wrapping the Dispatcher as the innermost layer.
+Registers global middleware. Middleware runs in order on every request, wrapping the Dispatcher as the innermost layer. Middleware is created with `new` on each request, not by the container, so it can't take constructor dependencies. See [Middleware](/features/middleware/).
 
 ```php
-->run(): void
+->exceptions(array $map): static
 ```
 
-Boots the application, creates a PSR-7 `ServerRequest` from PHP globals, runs the pipeline, and emits the response.
+Shows the listed exceptions to the client instead of hiding them behind a `500`: `[SomeException::class => 404]` keeps the exception's message, `[SomeException::class => [409, 'Conflict']]` replaces it. See [Error Handling](/features/error-handling/#showing-library-exceptions). An invalid map (a class that isn't an exception, or a status outside `400`–`599`) throws `InvalidArgumentException` right away.
+
+`providers()`, `routeProviders()`, `middleware()` and `exceptions()` each **replace** their list, so calling one twice keeps only the second call's list. Pass everything in one call.
+
+### Running the App
+
+| Method | Runtime | What it does |
+|---|---|---|
+| `->run(): void` | PHP-FPM, `php -S`, any classic setup | Boots, builds the request from PHP globals, handles it, and sends the response. |
+| `->runSwoole(string $host = '0.0.0.0', int $port = 8000): void` | Swoole | Boots **once**, then starts a Swoole HTTP server that handles every request with the same booted app. Requires the `swoole` extension and `composer require ilexn/swoole-psr7`. |
+| `->runWorker(): void` | FrankenPHP worker mode | Boots **once**, then handles requests in a loop with `frankenphp_handle_request()` until FrankenPHP stops the worker. Set `MAX_REQUESTS` to restart the worker after that many requests (a guard against memory leaks). Throws if not running under FrankenPHP. |
+| `->boot(): void` + `->handle($request): ResponseInterface` | Tests, custom runtimes | `boot()` sets everything up; `handle()` runs one PSR-7 request through middleware, the Dispatcher and the error handler, and returns the response without sending it. |
+
+Under `runSwoole()` and `runWorker()` the app stays in memory between requests. Use [`scoped()`](/packages/container/bindings/#scoped-instances) for anything that holds per-request state.
+
+See [Boot Sequence](/core/boot-sequence/) for exactly what `boot()` does.
+
+## Environment Variables
+
+`Application` reads these from `.env` (or the real environment):
+
+| Variable | Default | Effect |
+|---|---|---|
+| `APP_ENV` | `local` | `production` turns on the [route cache](/packages/router/caching/) and changes the defaults of `APP_DEBUG` and `APP_DOCS` |
+| `APP_DEBUG` | on, off when `APP_ENV=production` | Adds the real error to `500` responses. See [Error Handling](/features/error-handling/#debug-mode) |
+| `APP_DOCS` | on, off when `APP_ENV=production` | Registers `/openapi.json` and `/docs`. See [OpenAPI](/features/openapi/#turning-the-docs-on-or-off) |
+| `MAX_REQUESTS` | `0` (no limit) | `runWorker()` only: restart each FrankenPHP worker after this many requests |
+
+`APP_DEBUG` and `APP_DOCS` accept `true`/`false`, `1`/`0`, `on`/`off` and `yes`/`no`. Any other value falls back to the default.
 
 ## Full Example
 
@@ -53,6 +81,9 @@ Application::create(__DIR__ . '/..')
         AuthMiddleware::class,
         LogMiddleware::class,
     ])
+    ->exceptions([
+        EmailAlreadyTaken::class => 409,
+    ])
     ->run();
 ```
 
@@ -61,6 +92,9 @@ Application::create(__DIR__ . '/..')
 Use `boot()` + `handle()` to test without emitting output:
 
 ```php
+use Antares\Application;
+use Nyholm\Psr7\Factory\Psr17Factory;
+
 $app = Application::create(__DIR__ . '/..')
     ->providers([AppServiceProvider::class])
     ->routeProviders([RouteServiceProvider::class]);
@@ -72,3 +106,5 @@ $response = $app->handle($request);
 
 assert($response->getStatusCode() === 200);
 ```
+
+`boot()` reads `$_ENV`, so set variables such as `APP_ENV` or `APP_DEBUG` before calling it. Call `boot()` once and reuse the app for every request in a test; `handle()` resets per-request state (scoped instances and `ResponseBag` headers) on each call.

@@ -12,7 +12,16 @@ composer require fatjon-lleshi/antares-container
 ## Features
 
 - Automatic constructor injection via reflection
-- Interface-to-concrete bindings
-- Singleton registration with factory closures
+- Interface-to-concrete bindings with `bind()`
+- Shared instances with `singleton()` (one per process) and `scoped()` (one per request)
 - Recursive nested dependency resolution
 - Circular dependency detection
+
+## Lifetimes at a Glance
+
+| Registered with | `make()` returns |
+|---|---|
+| nothing (autowired) | a **new** instance every call |
+| `bind(Interface::class, Concrete::class)` | whatever `make(Concrete::class)` returns |
+| `singleton(Class::class, $factory)` | the **same** instance for the life of the process |
+| `scoped(Class::class, $factory)` | the same instance until `clearScoped()` is called. The framework calls it at the start of every request |

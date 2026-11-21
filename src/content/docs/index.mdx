@@ -15,10 +15,11 @@ A modern, lightweight PHP framework designed for building fast and scalable APIs
 
 ## Features
 
-- **Dependency Injection** - Powerful autowiring container with constructor injection, singletons, and contextual bindings.
+- **Dependency Injection** - Autowiring container with constructor injection, interface bindings, singletons, and per-request scoped instances.
 - **Attribute Routing** - Define routes using PHP 8 attributes directly on controller methods.
 - **Validation & DTOs** - Type-safe request validation with automatic DTO hydration.
-- **PSR Compliant** - Built on PSR-7 HTTP messages and PSR-15 middleware.
+- **Response DTOs & OpenAPI** - Typed responses, serialized to JSON, with an OpenAPI spec generated from the same classes.
+- **PSR-7** - Requests and responses are PSR-7 messages, with a simple middleware pipeline around them.
 
 ## Quick Example
 

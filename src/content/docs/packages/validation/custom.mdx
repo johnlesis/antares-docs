@@ -23,7 +23,9 @@ final class Slug implements ValidationAttribute
 }
 ```
 
-Return a string error message if validation fails, `null` if it passes. Then use it like any built-in attribute:
+Return a string error message if validation fails, `null` if it passes. The rule receives the property's value after hydration, so it may be `null` for nullable fields. The built-in rules return `null` (pass) for values they don't apply to, and leave "is this required?" to the type or `#[NotNull]`; doing the same in your own rules keeps them combinable.
+
+Then use it like any built-in attribute:
 
 ```php
 #[Dto]

@@ -14,21 +14,59 @@ Two routes are registered automatically on boot:
 | `GET /openapi.json` | The raw OpenAPI 3.0 spec as JSON |
 | `GET /docs` | Swagger UI, pre-configured against `/openapi.json` |
 
+Swagger UI is loaded from unpkg.com, so `/docs` needs internet access in the browser.
+
+## Turning the Docs On or Off
+
+Both endpoints are public. By default they are **on in every environment except `APP_ENV=production`**. Set `APP_DOCS` in your `.env` to override that:
+
+```env
+APP_DOCS=true    # force docs on, e.g. a staging server running APP_ENV=production
+APP_DOCS=false   # force docs off, e.g. locally
+```
+
+| `APP_ENV` | `APP_DOCS` | Docs |
+|---|---|---|
+| `local` (or anything but `production`) | not set | on |
+| `production` | not set | **off** |
+| any | `true` | on |
+| any | `false` | off |
+
+In production the route list is cached. Changing `APP_DOCS` in `.env` rebuilds the cache automatically. If you set it as a real server environment variable instead, run `php bin/antares cache:clear` after changing it.
+
+:::caution[Changed in 0.2]
+In 0.1 the docs were always on, including in production. If you want them on a production server, add `APP_DOCS=true`.
+:::
+
 ## What Gets Generated
 
 The spec is built entirely from your code:
 
-- **Paths & methods** — derived from `#[Get]`, `#[Post]`, `#[Put]`, `#[Patch]`, `#[Delete]` attributes
-- **Request body schema** — derived from `#[Dto]` class properties and their validation attributes (`#[Email]`, `#[Min]`, `#[MaxLength]`, etc.)
-- **Response schema** — derived from `#[ResponseDto]` class properties and serialization attributes
+- **Paths & methods** — derived from `#[Get]`, `#[Post]`, `#[Put]`, `#[Patch]`, `#[Delete]` attributes, including the success status code
+- **Path parameters** — `{id}` in the route, documented when a method argument has the same name
+- **Query parameters** — other `int`, `float`, `bool` and `string` arguments, read from the query string the same way the dispatcher does: required unless they have a default value, which is shown as the default. Arguments filled by a guard or `#[Inject]` are left out
+- **Request body schema** — any argument whose class has `#[Dto]`, with its validation attributes (`#[Email]`, `#[Min]`, `#[MaxLength]`, etc.) as constraints
+- **Response schema** — a return type whose class has `#[ResponseDto]`, using its serialization attributes
 - **Hidden fields** — properties annotated with `#[Hide]` are excluded from both request and response schemas
 - **Renamed fields** — `#[SerializeAs('key')]` overrides are reflected in the response schema
+- **Computed fields** — `#[Computed]` methods appear under the same name the serializer outputs, marked `readOnly`
+
+Schemas are built from **constructor parameters**, so declare DTO fields as promoted constructor properties.
+
+## Query Parameters
+
+```php
+#[Get('/posts')]
+public function index(string $search, int $page = 1, bool $drafts = false): PostListResponse {}
+```
+
+documents `search` as a required string, `page` as an optional integer with default `1`, and `drafts` as an optional boolean with default `false`, matching what `GET /posts?search=php&page=2` passes to the method.
 
 ---
 
 ## Example
 
-Given this DTO, response, and controller:
+Given this DTO (in `App\DTOs`), response (in `App\Responses`), and controller:
 
 ```php
 #[Dto]
@@ -48,7 +86,7 @@ readonly class CreatePostRequest
     ) {}
 }
 
-#[ResponseDto(case: 'snake_case')]
+#[ResponseDto(case: CaseStyle::SnakeCase)]
 readonly class PostResponse
 {
     public function __construct(
@@ -78,65 +116,63 @@ class PostController
 {
     #[Post('/posts', 201)]
     public function store(
-        #[Guards(JwtGuard::class)] AuthUser $user,
+        #[Guard(JwtGuard::class)] AuthUser $user,
         CreatePostRequest $request,
     ): PostResponse {}
 }
 ```
 
-Antares generates:
+Antares generates (shortened to the parts this example produces):
 
 ```json
 {
-    "/posts": {
-        "post": {
-            "summary": "Store",
-            "operationId": "store",
-            "requestBody": {
-                "required": true,
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "type": "object",
-                            "required": ["title", "body"],
-                            "properties": {
-                                "title": {
-                                    "type": "string",
-                                    "minLength": 5
-                                },
-                                "body": {
-                                    "type": "string",
-                                    "minLength": 20
-                                },
-                                "status": {
-                                    "type": "string",
-                                    "enum": ["draft", "published"],
-                                    "default": "draft"
-                                }
+    "paths": {
+        "/posts": {
+            "post": {
+                "summary": "Store",
+                "responses": {
+                    "201": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/App\\Responses\\PostResponse" }
                             }
+                        }
+                    }
+                },
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/App\\DTOs\\CreatePostRequest" }
                         }
                     }
                 }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "App\\DTOs\\CreatePostRequest": {
+                "type": "object",
+                "required": ["title", "body"],
+                "properties": {
+                    "title":  { "type": "string", "minLength": 5 },
+                    "body":   { "type": "string", "minLength": 20 },
+                    "status": { "type": "string", "enum": ["draft", "published"] }
+                }
             },
-            "responses": {
-                "201": {
-                    "description": "Created",
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "id": { "type": "integer" },
-                                    "title": { "type": "string" },
-                                    "body": { "type": "string" },
-                                    "status": { "type": "string" },
-                                    "author_id": { "type": "integer" },
-                                    "created_at": { "type": "string" },
-                                    "excerpt": { "type": "string" }
-                                }
-                            }
-                        }
-                    }
+            "App\\Responses\\PostResponse": {
+                "type": "object",
+                "required": ["id", "title", "body", "status", "author_id", "created_at", "excerpt"],
+                "properties": {
+                    "id":         { "type": "integer" },
+                    "title":      { "type": "string" },
+                    "body":       { "type": "string" },
+                    "status":     { "type": "string" },
+                    "author_id":  { "type": "integer" },
+                    "created_at": { "type": "string" },
+                    "excerpt":    { "type": "string", "readOnly": true }
                 }
             }
         }
@@ -144,7 +180,17 @@ Antares generates:
 }
 ```
 
-`internalNotes` is excluded. `userId` appears as `author_id`. `excerpt` is included as a computed field. The request schema reflects all validation constraints.
+- `internalNotes` is excluded, `userId` appears as `author_id`, and `excerpt` is included as a read-only computed field.
+- `$user` is filled by a guard, so it doesn't appear in the spec.
+- The `summary` is the method name with a capital first letter, and the success response's description is always `Success`.
+- Schemas are named by the class's full name (`App\DTOs\CreatePostRequest`).
+- `#[NotBlank]` has no OpenAPI equivalent and isn't shown; `title` and `body` are `required` because they have no default.
+
+## Not Documented Yet
+
+- Error responses (`400`, `422`, `401`, …): only the success response is listed.
+- Route parameters with a regex, such as `{id:\d+}`, are not recognised as path parameters.
+- Default values of request DTO fields.
 
 ---
 

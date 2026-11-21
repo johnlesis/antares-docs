@@ -3,19 +3,19 @@ title: Boot Sequence
 description: What happens when Antares boots
 ---
 
-When `Application::run()` or `Application::boot()` is called, the following steps execute in order:
+`Application::boot()` runs once per process: on every request under PHP-FPM, and once at startup under Swoole. `run()`, `runSwoole()` and `runWorker()` call it for you. These steps execute in order:
 
-1. **Load `.env`** — `vlucas/phpdotenv` loads environment variables from your project root. Missing variables do not throw; they simply remain unset.
+1. **Load `.env`.** `vlucas/phpdotenv` loads environment variables from the base path, without overwriting variables that are already set. A missing `.env` file is not an error. `APP_BASE_PATH` is set to the base path.
 
-2. **Create Container** — A fresh `Container` instance is created. `Router` and `Generator` (OpenAPI) are registered as singletons immediately.
+2. **Create the container.** A fresh `Container` is created, and `Router` and the OpenAPI `Generator` are registered as singletons.
 
-3. **Auto-discover bridge providers** — Antares reads `vendor/composer/installed.json` and collects any `extra.antares.providers` entries from installed packages. Bridge providers (Monolog, Eloquent) are registered this way — no manual registration required.
+3. **Register bridge providers.** Antares reads `vendor/composer/installed.json` and registers every provider listed under `extra.antares.providers` by an installed package (Monolog, Eloquent, …).
 
-4. **Register service providers** — Each class passed to `->providers([...])` is instantiated and its `register()` method is called with the container.
+4. **Register your service providers.** Each class passed to `->providers([...])` is created and its `register()` method is called. Because this happens after step 3, your bindings replace a bridge's.
 
-5. **Register route providers (or load cache)** — In production (`APP_ENV=production`) with a valid cache fingerprint, the compiled route cache is loaded directly. Otherwise, each route provider's `register()` is called and the OpenAPI controller is added automatically.
+5. **Register routes, or load them from the cache.** With `APP_ENV=production` and a cache whose fingerprint still matches, routes are loaded from `storage/cache/routes.php` and **route providers are skipped**. Otherwise each route provider's `register()` is called, the OpenAPI controller (`/openapi.json`, `/docs`) is added unless the [docs are turned off](/features/openapi/#turning-the-docs-on-or-off), and in production the result is written to the cache.
 
-6. **Wire Dispatcher, ErrorHandler, Pipeline** — The Dispatcher, ErrorHandler, and Pipeline are created and stored on the application instance, ready to handle requests.
+6. **Create the Dispatcher and ErrorHandler.** Middleware is not created here: the pipeline creates it for each request.
 
 ## Cache Fingerprint
 
@@ -25,4 +25,4 @@ The route cache fingerprint is computed from:
 - `.env`
 - All files under `app/`
 
-If any of these change, the fingerprint changes and the cache is invalidated automatically on the next request.
+If any of these change, the fingerprint changes and the cache is rebuilt on the next boot. Changes made anywhere else (for example a real environment variable, or routes loaded from a `config/` file) are not detected; run `php bin/antares cache:clear` after those.

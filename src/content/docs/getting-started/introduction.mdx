@@ -12,18 +12,18 @@ And auto-generated OpenAPI docs — with zero magic and no hidden conventions.
 ## Philosophy
 
 - **Explicit over implicit.** Every request and response is typed. Routes are defined where you can see them — attributes, array config, or YAML.
-- **Type-safe by default.** PHP 8.2+ readonly DTOs, strict hydration, and reflection-based resolution throughout.
+- **Type-safe by default.** PHP 8.2+ typed DTOs, hydration that casts and checks every field, and reflection-based resolution throughout.
 - **Composable packages.** Each concern lives in its own Composer package. Use the full framework or pull in only what you need.
 - **No configuration tax.** Route caching and cache invalidation in Production, bridge auto-discovery
 - **Zero bootstrap overhead.** Built for worker runtimes — Swoole and FrankenPHP keep the app alive between requests.
-- **Composable.* Use the full framework or pull in just the container, router, or validation package independently.
+- **Composable.** Use the full framework or pull in just the container, router, or validation package independently.
 - **OpenAPI included.**  You define the contract — typed requests in, typed responses out. The docs write themselves.
 
 ## Packages
 
 | Package | Composer name | Description |
 |---|---|---|
-| `core` | `fatjon-lleshi/antares` | Application boot, Dispatcher, Pipeline, ErrorHandler, OpenAPI |
+| `core` | `fatjon-lleshi/antares` | Application boot, Dispatcher, Pipeline, ErrorHandler, response serialization, OpenAPI, CLI, migrations |
 | `container` | `fatjon-lleshi/antares-container` | Reflection-based autowiring DI container |
 | `router` | `fatjon-lleshi/antares-router` | Attribute-based routing on top of `nikic/fast-route` |
 | `validation` | `fatjon-lleshi/antares-validation` | DTO hydration + attribute-driven validation |

@@ -1,0 +1,19 @@
+---
+// Site title (top-left) with the docs version picker next to it.
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+import VersionSelect from 'starlight-versions/components/VersionSelect.astro';
+---
+
+<div class="site-title-group">
+	<Default><slot /></Default>
+	<VersionSelect />
+</div>
+
+<style>
+	.site-title-group {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		min-width: 0;
+	}
+</style>

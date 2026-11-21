@@ -18,7 +18,7 @@ if you downloaded the app, public/index.php is already there.
 use Antares\Application;
 use App\Providers\AppServiceProvider;
 use App\Providers\RouteServiceProvider;
-use App\Middleware\LogMiddleware;
+use App\Middleware\CorsMiddleware;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -29,8 +29,8 @@ Application::create(__DIR__ . '/..')
     ->run();
 ```
 
-##### swoole.php 
-provides swoole runtime with workers (requires php swoole extension)
+##### swoole.php
+Runs the app on a Swoole HTTP server, booted once and kept in memory. Requires the `swoole` PHP extension and `composer require ilexn/swoole-psr7`.
 
 ```php
 <?php
@@ -56,8 +56,8 @@ run with:
 php swoole.php
 ```
 
-##### worker.php 
-provides FrankenPHP runtime with workers
+##### worker.php
+For FrankenPHP's worker mode.
 
 ```php
 <?php
@@ -75,10 +75,12 @@ Application::create(__DIR__)
     ->routeProviders([RouteServiceProvider::class])
     ->runWorker();
 ```
-run with:
+FrankenPHP runs this file itself, so don't start it with `php worker.php` (that throws *runWorker() requires FrankenPHP runtime*). For example:
 ```bash
-php worker.php
+frankenphp php-server --worker worker.php
 ```
+
+The app is booted once per worker and then handles requests until FrankenPHP stops it. Set `MAX_REQUESTS` to have each worker restart after that many requests.
 
 ## Define a Controller
 
@@ -106,7 +108,7 @@ class UserController
 
 ## Register your Controller
 
-Define routes with PHP attributes:
+Add it to your route provider:
 
 ```php
 <?php
@@ -126,7 +128,7 @@ class RouteServiceProvider implements ServiceProvider
 ```
 
 ## Request DTO
-Define a readonly class with Attribute #[Dto] and parameter constructor promotion
+Define a class with the `#[Dto]` attribute and its fields as promoted constructor parameters
 
 ```php
 use Antares\Validation\Attributes\Dto;
@@ -150,7 +152,7 @@ readonly class CreateUserRequest
 ```
 
 ## Response DTO
-Define a readonly class with Attribute #[ResponseDto] and parameter constructor promotion
+Define a class with the `#[ResponseDto]` attribute and its fields as promoted constructor parameters
 
 ```php
 use Antares\Serialization\Attributes\ResponseDto;

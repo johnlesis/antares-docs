@@ -3,57 +3,94 @@ title: Validation Attributes
 description: Full reference of built-in validation attributes
 ---
 
+All attributes live in `Antares\Validation\Attributes` and go on constructor parameters. Each one returns an error message when it fails; all failures for a field are collected.
+
+:::note[Each rule only checks its own kind of value]
+String rules skip values that aren't strings, and number rules skip values that aren't numeric. In particular, **`null` passes every rule except `#[NotNull]` and `#[In]`**. Make a field non-nullable, or add `#[NotNull]`, when it must have a value.
+:::
+
 ## Strings
 
-| Attribute | Description |
-|---|---|
-| `#[NotBlank]` | Value must not be empty |
-| `#[MinLength(n)]` | Minimum string length |
-| `#[MaxLength(n)]` | Maximum string length |
-| `#[Email]` | Valid email address |
-| `#[Url]` | Valid URL |
-| `#[Pattern('/regex/')]` | Matches regular expression |
-| `#[Alpha]` | Alphabetic characters only |
-| `#[AlphaNumeric]` | Alphanumeric characters only |
-| `#[Numeric]` | Numeric string |
-| `#[HexColor]` | Valid hex color (`#fff` or `#ffffff`) |
-| `#[Uuid]` | Valid UUID v4 |
-| `#[Phone]` | Valid phone number |
-| `#[Ip]` | Valid IP address (v4 or v6) |
-| `#[Json]` | Valid JSON string |
+These only check string values.
+
+| Attribute | Passes when | Error message |
+|---|---|---|
+| `#[NotBlank]` | The string isn't empty or only whitespace | The value must not be blank. |
+| `#[MinLength(n)]` | At least `n` characters (multibyte-aware) | The value must be at least n characters long. |
+| `#[MaxLength(n)]` | At most `n` characters | The value must be at most n characters long. |
+| `#[Size(min, max)]` | Between `min` and `max` characters | The value must be between min and max characters. |
+| `#[Email]` | PHP's `FILTER_VALIDATE_EMAIL` accepts it | The value must be a valid email address. |
+| `#[Url]` | PHP's `FILTER_VALIDATE_URL` accepts it | The value must be a valid URL. |
+| `#[Ip]` | A valid IPv4 or IPv6 address | The value must be a valid IP address. |
+| `#[Uuid]` | UUID format `8-4-4-4-12` hex, any version, case-insensitive | The value must be a valid UUID. |
+| `#[Pattern('/regex/')]` | `preg_match` finds a match | does not match pattern |
+| `#[Alpha]` | Letters only (`ctype_alpha`) | The value must contain only letters. |
+| `#[AlphaNumeric]` | Letters and digits only (`ctype_alnum`) | The value must contain only letters and numbers. |
+| `#[Numeric]` | Digits only (`ctype_digit`): no sign, no decimal point | The value must contain only digits. |
+| `#[HexColor]` | `#fff` or `#ffffff` | The value must be a valid hex color. |
+| `#[Phone]` | 7–20 characters of digits, spaces, `-`, `(`, `)`, optional leading `+` | The value must be a valid phone number. |
+| `#[Json]` | `json_decode` succeeds | The value must be a valid JSON string. |
+| `#[Date(format)]` | Matches the date format exactly (default `Y-m-d`) | The value must be a valid date in format Y-m-d. |
+| `#[DateTime(format)]` | Matches the format exactly (default `Y-m-d H:i:s`) | The value must be a valid datetime in format Y-m-d H:i:s. |
+| `#[DateTimeImmutable(format)]` | Same check as `#[DateTime]` | The value must be a valid datetime in format Y-m-d H:i:s. |
+
+`#[Date]`, `#[DateTime]` and `#[DateTimeImmutable]` check the string; the field itself stays a `string`. Convert it yourself, e.g. `new \DateTimeImmutable($request->startsAt)`. Note that `#[DateTimeImmutable]` shares its short name with PHP's `\DateTimeImmutable` class; alias the import if you need both in one file.
 
 ## Numbers
 
-| Attribute | Description |
-|---|---|
-| `#[Min(n)]` | Minimum numeric value |
-| `#[Max(n)]` | Maximum numeric value |
-| `#[Between(min, max)]` | Value within range (inclusive) |
-| `#[Positive]` | Value must be positive |
-| `#[Negative]` | Value must be negative |
+These only check numeric values (numbers or numeric strings).
 
-## General
+| Attribute | Passes when | Error message |
+|---|---|---|
+| `#[Min(n)]` | Value ≥ `n` | The value must be at least n. |
+| `#[Max(n)]` | Value ≤ `n` | The value must be at most n. |
+| `#[Between(min, max)]` | `min` ≤ value ≤ `max` | The value must be between min and max. |
+| `#[Positive]` | Value > 0 | The value must be a positive number. |
+| `#[Negative]` | Value < 0 | The value must be a negative number. |
 
-| Attribute | Description |
-|---|---|
-| `#[NotNull]` | Value must not be null |
-| `#[In([...])]` | Value must be in the given list |
-| `#[InEnum(MyEnum::class)]` | Value must be a valid enum case |
-| `#[Size(n)]` | Array must have exactly n elements |
-| `#[ArrayOf(type)]` | All array elements must be of the given type |
-| `#[Date]` | Valid date string (`Y-m-d`) |
-| `#[DateTime]` | Valid datetime string (`Y-m-d H:i:s`) |
+## Other Rules
+
+| Attribute | Passes when | Error message |
+|---|---|---|
+| `#[NotNull]` | The value isn't `null` | The value must not be null. |
+| `#[In([...])]` | The value is in the list, compared **strictly** (`'1'` doesn't match `1`) | The value must be one of: a, b. |
+| `#[InEnum(MyEnum::class)]` | `MyEnum::tryFrom($value)` finds a case. The enum must be a **backed** enum | The value must be one of the following: a, b. |
+| `#[ArrayOf(type)]` | The value is an array whose items are all of `type`: `'string'`, `'int'`, `'float'`, `'bool'`, `'array'`, or a class name (`instanceof`) | The value must be an array. / Item at index i must be of type T. |
+
+## File Uploads
+
+`#[File]` validates an uploaded file on a controller parameter typed `UploadedFileInterface`. It is not used inside DTOs.
+
+```php
+use Antares\Validation\Attributes\File;
+use Psr\Http\Message\UploadedFileInterface;
+
+#[Post('/avatars', 201)]
+public function upload(
+    #[File(maxSize: 2048, mimes: ['image/png', 'image/jpeg'], extensions: ['png', 'jpg'])]
+    UploadedFileInterface $avatar,
+): array {}
+```
+
+| Option | Default | Checks |
+|---|---|---|
+| `maxSize` | `0` (no limit) | Size in **kilobytes** |
+| `mimes` | `[]` (any) | MIME type detected from the file's contents |
+| `extensions` | `[]` (any) | Extension of the client's file name, lowercased |
+| `required` | `true` | Rejects an empty file field (no file chosen) |
+
+A failed check returns `422` with the error under the parameter name. If the request has no field with that name at all, it is rejected with `400 Missing file: avatar` before `#[File]` runs, even with `required: false`.
 
 ## DTO Markers
 
 | Attribute | Description |
 |---|---|
-| `#[Dto]` | Marks a class as hydratable |
-| `#[Strict]` | Enables strict type checking during hydration |
+| `#[Dto]` | Marks a class as hydratable from request data |
+| `#[Strict]` | Rejects request fields the DTO doesn't declare (`400`) |
 
 ## Validation Error Response
 
-When validation fails, the framework returns a `422` response with a field-level error map:
+When validation fails, the framework returns `422` with every failed rule, per field:
 
 ```json
 {
@@ -61,8 +98,8 @@ When validation fails, the framework returns a `422` response with a field-level
     "title": "Validation failed",
     "status": 422,
     "errors": {
-        "email": ["Must be a valid email address"],
-        "name": ["Must be at least 2 characters"]
+        "email": ["The value must be a valid email address."],
+        "name": ["The value must be at least 2 characters long."]
     }
 }
 ```

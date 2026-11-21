@@ -1,22 +1,31 @@
 ---
 title: Error Handling
-description: Automatic exception-to-HTTP-response mapping
+description: Which errors the client sees, which stay hidden, and how errors are logged
 ---
 
-All exceptions are caught by the `ErrorHandler` and converted to [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807) Problem Detail JSON responses.
+Every exception thrown while handling a request (in middleware, guards, controllers or your services) is caught by the `ErrorHandler` and turned into a JSON error response, loosely following [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807) Problem Details.
 
-## Mapping
+The rule is simple: **an error's message is only shown if the exception was meant for the client.** Everything else becomes a generic `500`, so a database error or a bug never leaks details to your users.
 
-| Exception | Status code |
-|---|---|
-| `ValidationException` | `422 Unprocessable Entity` |
-| `HydrationException` | `400 Bad Request` |
-| `HttpException($code, $message)` | `$code` |
-| Any other `Throwable` | `500 Internal Server Error` |
+## What the Client Sees
 
-## Throwing HTTP Errors
+| Exception | Status | `title` in the response |
+|---|---|---|
+| `ValidationException` (a DTO broke a rule) | `422` | `Validation failed`, plus an `errors` map |
+| `HydrationException` (the body doesn't fit the DTO) | `400` | its message, e.g. `Missing required parameter: email` |
+| Unknown route | `404` | `Route not found` |
+| Known route, wrong HTTP method | `405`, with an `Allow` header | `Method not allowed` |
+| `HttpException($code, $message)`, or anything implementing `HttpExceptionInterface` | `$code` | its message |
+| An exception listed in [`->exceptions([...])`](#showing-library-exceptions) | the mapped status | its message, or the mapped one |
+| **Anything else** | `500` | `Internal Server Error` |
 
-Use `HttpException` anywhere in your application — controllers, guards, middleware, services:
+The messages of the rows above "Anything else" are shown **in every environment**. You decide what the client sees by choosing which exception to throw.
+
+## Showing an Error to the Client
+
+### Throw an `HttpException`
+
+The simplest way. The status code comes **first**:
 
 ```php
 use Antares\Exceptions\HttpException;
@@ -26,9 +35,108 @@ throw new HttpException(404, 'User not found');
 throw new HttpException(409, 'Email already in use');
 ```
 
+### Write your own exception
+
+For errors you throw in several places, implement `HttpExceptionInterface`. It works with any base class:
+
+```php
+use Antares\Exceptions\HttpExceptionInterface;
+
+final class EmailAlreadyTaken extends \DomainException implements HttpExceptionInterface
+{
+    public function __construct()
+    {
+        parent::__construct('Email already in use');
+    }
+
+    public function getStatusCode(): int
+    {
+        return 409;
+    }
+}
+
+throw new EmailAlreadyTaken(); // 409 "Email already in use"
+```
+
+`HttpException` itself implements this interface. A status code outside `400`–`599` is treated as an unexpected error (`500`).
+
+### Showing library exceptions
+
+For exceptions you can't change, such as those thrown by a library, map them on the application:
+
+```php
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
+
+Application::create(__DIR__ . '/..')
+    ->exceptions([
+        ModelNotFoundException::class => 404,                 // keeps the exception's message
+        QueryException::class         => [409, 'Conflict'],   // replaces it with your own
+    ])
+    ->run();
+```
+
+Subclasses match too, and the first matching entry wins. The map is checked on boot, so a typo (a class that isn't an exception, or a status outside `400`–`599`) fails immediately.
+
+Only replace the message (`[status, 'message']`) when the original might contain internal details, as a `QueryException`'s SQL does.
+
+## Debug Mode
+
+In development you want to see what went wrong. With `APP_DEBUG` on, a `500` also includes a `debug` block with the real error:
+
+```json
+{
+    "type": "https://antares.dev/errors",
+    "title": "Internal Server Error",
+    "status": 500,
+    "debug": {
+        "message": "SQLSTATE[42S02]: Base table or view not found",
+        "exception": "PDOException",
+        "file": "app/Repositories/UserRepository.php:42",
+        "trace": ["app/Controllers/UserController.php:18", "…"]
+    }
+}
+```
+
+`file` and `trace` are relative to your project root. If the exception wraps another one, the wrapped error is shown under `debug.previous`.
+
+| `APP_ENV` | `APP_DEBUG` | Error details in `500` responses |
+|---|---|---|
+| `local` (or anything but `production`) | not set | shown |
+| `production` | not set | **hidden** |
+| any | `true` | shown |
+| any | `false` | hidden |
+
+```env
+APP_DEBUG=false   # e.g. a staging server that runs APP_ENV=local
+```
+
+:::danger
+Never set `APP_DEBUG=true` on a public production server: the debug block exposes file paths, SQL and other internals.
+:::
+
+## Logging
+
+Every `5xx` response is logged with the full exception, in every environment:
+
+- If a `Psr\Log\LoggerInterface` is registered in the container, it is logged there at `error` level, with the exception in the `exception` context key. The [Monolog bridge](/packages/bridges/monolog/) registers one automatically.
+- Otherwise it is written with PHP's `error_log()`, including the stack trace.
+
+`4xx` responses are not logged: they are the client's mistake, not your app's.
+
 ## Response Shape
 
-Every error response follows RFC 7807:
+Every error response is JSON (`Content-Type: application/json`) with `type`, `title` and `status`:
+
+```json
+{
+    "type": "https://antares.dev/errors",
+    "title": "User not found",
+    "status": 404
+}
+```
+
+Validation errors also include an `errors` map with every failed rule per field:
 
 ```json
 {
@@ -36,14 +144,8 @@ Every error response follows RFC 7807:
     "title": "Validation failed",
     "status": 422,
     "errors": {
-        "email": ["Must be a valid email address"],
-        "name": ["Must be at least 2 characters"]
+        "email": ["The value must be a valid email address."],
+        "name": ["The value must be at least 2 characters long."]
     }
 }
 ```
-
-Validation errors include a field-level `errors` map. Other errors include only `type`, `title`, and `status`.
-
-## Production vs Development
-
-When `APP_ENV=production`, `500` responses do not leak exception messages or stack traces. In local/development mode, the full exception message is included in the `title` field.

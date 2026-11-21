@@ -50,14 +50,23 @@ public function destroy(int $id): void { /* ... */ }
 
 ## Route Parameters
 
-Segments wrapped in `{}` are route parameters. They are extracted and injected into the controller method by name, cast to the declared type:
+Segments wrapped in `{}` are route parameters:
 
 ```php
 #[Get('/posts/{postId}/comments/{commentId}')]
 public function show(int $postId, int $commentId): array { /* ... */ }
 ```
 
-Supported cast targets: `int`, `float`, `bool`, `string`.
+Because the router is built on `nikic/fast-route`, you can also restrict a parameter with a regex: `#[Get('/users/{id:\d+}')]`.
+
+`$router->match()` returns the parameters as **strings**, keyed by name. In the framework, the [Dispatcher](/core/dispatcher/) passes them to the method argument with the same name and casts them to `int`, `float` or `bool`. A value that doesn't fit the type (for example `/users/abc` for `int $id`) is rejected with `400 Bad Request`.
+
+## Matching a Request
+
+```php
+[$controller, $method, $params, $status] = $router->match('GET', '/posts/7/comments/3');
+// CommentController::class, 'show', ['postId' => '7', 'commentId' => '3'], 200
+```
 
 ## Registering Controllers
 
@@ -66,3 +75,5 @@ $router = new Router();
 $router->register(UserController::class);
 $router->register(PostController::class);
 ```
+
+`register()` scans every method of the class. A method can carry several route attributes for different HTTP methods, for example both `#[Put]` and `#[Patch]`.

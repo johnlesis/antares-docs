@@ -3,68 +3,83 @@ title: Dispatcher
 description: How Antares resolves controller method parameters and builds responses
 ---
 
-The `Dispatcher` sits at the centre of every request. It matches the route, resolves all controller method parameters, invokes the method, and converts the return value into a PSR-7 response.
+The `Dispatcher` sits at the centre of every request. It matches the route, builds the controller through the container, resolves every method parameter, invokes the method, and converts the return value into a PSR-7 response.
+
+At the start of each request it also clears `scoped()` container instances and any leftover [`ResponseBag`](#responsebag) headers.
 
 ## Parameter Resolution
 
-Parameters are resolved in priority order:
+Parameters are resolved **one at a time, in the order they are declared**. For each parameter, the first matching rule wins:
 
-| Condition | Resolution |
-|---|---|
-| Parameter has `#[Guards(GuardClass::class)]` | Guard is instantiated and `resolve($request)` is called |
-| Type is `ServerRequestInterface` | The raw PSR-7 request is injected |
-| Type is `UploadedFileInterface` | The uploaded file matching the parameter name is injected |
-| Name matches a route segment (`/users/{id}`) | Value is cast to `int`, `float`, `bool`, or `string` |
-| Type is a class annotated with `#[Dto]` | Body is decoded and hydrated+validated via the Hydrator |
-| Type is any other non-builtin class | Resolved via `$container->make()` |
-| Name matches a query parameter | Value is cast and injected |
-| Parameter has a default value | Default is used |
+| # | Condition | Resolution |
+|---|---|---|
+| 1 | Has an attribute that resolves values, such as `#[Guard(...)]` or `#[Inject(...)]` | That class is built by the container and its `resolve($request)` result is injected |
+| 2 | No type, or a union/intersection type | Its default value, otherwise an error (`500`) |
+| 3 | Type is `ServerRequestInterface` | The PSR-7 request |
+| 4 | Type is `UploadedFileInterface` | The uploaded file with the same name as the parameter (`400` if missing or if several files share the name), checked by [`#[File]`](/packages/validation/attributes/#file-uploads) if present (`422` on failure) |
+| 5 | Name matches a route segment (`/users/{id}`) | Cast to the parameter's type (`int`, `float`, `bool`); `400` if the value doesn't fit |
+| 6 | Type is a class marked `#[Dto]` | The request body, hydrated and validated (`400` / `422` on failure) |
+| 7 | Type is any other class or interface | `$container->make()` |
+| 8 | Name matches a query parameter | Cast like a route parameter; `400` if it's an array (`?page[]=1`) |
+| 9 | Has a default value | The default |
+| 10 | Nothing matched | An error (`500`): `Cannot resolve parameter $name in controller.` |
+
+Because of this order, a guard only protects the rest of the method's parameters if it is declared before them.
 
 ## Response Building
 
 The return value of the controller method determines the response:
 
-| Return type | Response |
+| Return value | Response |
 |---|---|
 | `ResponseInterface` | Returned as-is |
 | `null` / `void` | Empty body with the route's status code |
-| `array` | JSON-encoded, `Content-Type: application/json` |
-| Object annotated with `#[ResponseDto]` | Serialized to array by the Serializer, then JSON-encoded |
+| `array` or scalar | JSON-encoded with the route's status code, `Content-Type: application/json` |
+| Object marked `#[ResponseDto]` | Serialized to an array by the [Serializer](/features/response-dtos/), then JSON-encoded |
+| Any other object | An error (`500`): *Controller returned an object without #[ResponseDto]* |
+
+If `json_encode` fails (for example on invalid UTF-8), the response is a `500` too.
+
+These `500`s are mistakes in the app, not the client's, so their messages are only shown with [`APP_DEBUG`](/features/error-handling/#debug-mode) on and are always logged.
 
 ## Guards
 
 Guards let you authenticate or authorise a request and inject the resolved principal into the controller:
 
 ```php
-use Antares\Http\Attributes\Guards;
+use Antares\Exceptions\HttpException;
+use Antares\Http\ResolverInterfaces\Guard;
+use Psr\Http\Message\ServerRequestInterface;
 
-final class JwtGuard
+final class JwtGuard implements Guard
 {
     public function __construct(private readonly JwtService $jwt) {}
 
     public function resolve(ServerRequestInterface $request): AuthUser
     {
-        $token = ltrim($request->getHeaderLine('Authorization'), 'Bearer ');
+        $token = preg_replace('/^Bearer\s+/i', '', $request->getHeaderLine('Authorization'));
         return $this->jwt->decode($token) ?? throw new HttpException(401, 'Unauthorized');
     }
 }
 ```
 
 ```php
+use Antares\Http\Attributes\Guard;
+
 #[Post('/posts', 201)]
 public function store(
-    #[Guards(JwtGuard::class)] AuthUser $user,
+    #[Guard(JwtGuard::class)] AuthUser $user,
     CreatePostRequest $request,
 ): PostResponse {
     // $user is the decoded JWT principal
 }
 ```
 
-The guard runs before any other parameter is resolved. If it throws, the request is rejected immediately.
+See [Guards & Resolvers](/features/guards/) for more.
 
 ## ResponseBag
 
-Set response headers from anywhere in your application:
+Set response headers from anywhere in your application, for example a service or a guard:
 
 ```php
 use Antares\Http\ResponseBag;
@@ -73,4 +88,4 @@ ResponseBag::header('X-Request-Id', uniqid());
 ResponseBag::header('X-Rate-Limit-Remaining', '99');
 ```
 
-Headers are applied to the final response and cleared after each request.
+The headers are added to the controller's response, including a returned `ResponseInterface`, and then cleared. Setting the same header twice keeps the last value. Headers are **not** added to error responses: if an exception is thrown, the error response is built without them.

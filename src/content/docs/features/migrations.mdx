@@ -3,9 +3,22 @@ title: Migrations
 description: Database migrations via raw PDO, independent of any ORM
 ---
 
-Antares ships its own migration system built on raw PDO — no ORM required. It works with any database driver and sits completely independently of the Eloquent bridge or any other ORM you choose to use.
+Antares ships its own migration system built on raw PDO, with no ORM required. It works independently of the Eloquent bridge or any other ORM you choose to use.
 
-Supported drivers: MySQL, PostgreSQL, SQL Server, and Oracle.
+## Connection
+
+Migrations connect with these environment variables:
+
+| Variable | Default |
+|---|---|
+| `DB_DRIVER` | `mysql` |
+| `DB_HOST` | `127.0.0.1` |
+| `DB_PORT` | `3306` |
+| `DB_DATABASE` | (empty) |
+| `DB_USERNAME` | (empty) |
+| `DB_PASSWORD` | (empty) |
+
+The connection string is built as `{DB_DRIVER}:host={DB_HOST};port={DB_PORT};dbname={DB_DATABASE}`, so **MySQL (`mysql`) and PostgreSQL (`pgsql`)** work. SQLite, SQL Server and Oracle use a different connection string format and can't connect yet.
 
 ---
 
@@ -15,15 +28,16 @@ Supported drivers: MySQL, PostgreSQL, SQL Server, and Oracle.
 php bin/antares make:migration create_users_table
 ```
 
-This creates a file in `database/migrations/` with a timestamp prefix, e.g. `2024_01_15_103000_create_users_table.php`:
+This creates a file in `database/migrations/` with a timestamp prefix, e.g. `2026_01_15_103000_create_users_table.php`. It contains a plain class (no namespace, no base class) whose name is the file name without the timestamp, in PascalCase:
 
 ```php
-use Antares\Database\Migration;
-use PDO;
+<?php
 
-class CreateUsersTable extends Migration
+declare(strict_types=1);
+
+final class CreateUsersTable
 {
-    public function up(PDO $pdo): void
+    public function up(\PDO $pdo): void
     {
         $pdo->exec("
             CREATE TABLE users (
@@ -35,12 +49,14 @@ class CreateUsersTable extends Migration
         ");
     }
 
-    public function down(PDO $pdo): void
+    public function down(\PDO $pdo): void
     {
         $pdo->exec("DROP TABLE IF EXISTS users");
     }
 }
 ```
+
+Keep the class name and file name in sync: the runner derives the class name from the file name. Class names must be unique across all migrations.
 
 ---
 
@@ -52,7 +68,7 @@ Run all pending migrations:
 php bin/antares migrate
 ```
 
-Migrations are tracked in a `migrations` table. Already-ran migrations are skipped. Each run is grouped into a batch.
+Migrations are tracked in a `migrations` table by file name. Already-run migrations are skipped, and everything run together is recorded as one batch.
 
 ---
 
@@ -70,14 +86,14 @@ Migrations in the last batch are rolled back in reverse order, calling each migr
 
 ## How It Works
 
-- Migration files live in `database/migrations/`
-- Files are sorted and run in order by their timestamp prefix
-- A `migrations` table tracks what has run and which batch it belongs to
+- Migration files live in `database/migrations/` (relative to where you run the command)
+- Files are sorted by name, so the timestamp prefix sets the order
 - The `migrations` table is created automatically on first run
-- Each migration receives a raw `PDO` instance — write any SQL your database supports
+- Each migration receives a raw `PDO` instance, set to throw exceptions on errors
+- Migrations are not wrapped in a transaction: if one fails halfway, the ones before it stay applied and recorded
 
 ---
 
 ## ORM Independence
 
-Migrations use raw PDO directly, so they work regardless of which ORM you use. Pair them with the Eloquent bridge, use a different ORM, or skip an ORM entirely — migrations don't care.
+Migrations use raw PDO directly, so they work regardless of which ORM you use. Pair them with the Eloquent bridge, use a different ORM, or skip an ORM entirely.

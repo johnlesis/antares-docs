@@ -5,6 +5,8 @@ description: Global middleware and request pipeline
 
 Middleware wraps the Dispatcher in layers. Each middleware receives the request, can modify it or short-circuit the pipeline, calls `$next`, and can modify the response on the way out.
 
+Antares middleware uses its own small interface, `handle(ServerRequestInterface $request, callable $next): ResponseInterface`. It is not PSR-15.
+
 ## Writing Middleware
 
 Implement `Antares\Middleware\MiddlewareInterface`:
@@ -54,6 +56,10 @@ final class CorsMiddleware implements MiddlewareInterface
 }
 ```
 
+:::caution[No constructor dependencies]
+Middleware is created with `new YourMiddleware()` on every request, **not** through the container. Its constructor can't take arguments, so services can't be injected. Load configuration inside the constructor, as above, or move logic that needs services into a [guard or resolver](/features/guards/), which are built by the container.
+:::
+
 ## Registering Middleware
 
 Pass middleware classes to `->middleware([...])` on the application. They run in the order given — the first item is the outermost layer:
@@ -70,7 +76,9 @@ Application::create(__DIR__ . '/..')
 
 ## Pipeline Internals
 
-The `Pipeline` wraps middleware around the Dispatcher using a recursive closure. The Dispatcher is always the innermost destination — middleware cannot bypass error handling, which wraps the entire pipeline.
+The `Pipeline` wraps middleware around the Dispatcher using a recursive closure. The Dispatcher is always the innermost destination. Error handling wraps the entire pipeline, so an exception thrown in middleware becomes a normal error response too.
+
+Middleware runs for **every** request, before the route is matched, including requests for routes that don't exist.
 
 ```
 Request → CorsMiddleware → RateLimitMiddleware → LogMiddleware → Dispatcher

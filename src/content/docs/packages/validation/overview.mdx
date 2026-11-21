@@ -3,7 +3,7 @@ title: Validation Overview
 description: DTO hydration and attribute-driven validation
 ---
 
-`antares-validation` provides two things: a **Hydrator** that maps raw arrays to readonly PHP DTOs, and a **Validator** that checks those DTOs against PHP attributes. All errors are collected before throwing — you always get the full error list, not just the first failure.
+`antares-validation` provides two things: a **Hydrator** that maps raw arrays to typed PHP DTOs, and a **Validator** that checks those DTOs against PHP attributes.
 
 ```bash
 composer require fatjon-lleshi/antares-validation
@@ -13,23 +13,34 @@ This package has no dependency on the Antares framework core and can be used in 
 
 ## How It Works
 
-1. Annotate a readonly class with `#[Dto]` and add validation attributes to its constructor parameters.
-2. Pass raw data (from a request body, form post, etc.) to `$hydrator->hydrate()`.
-3. If hydration succeeds, a fully typed DTO is returned. If validation fails, a `ValidationException` is thrown with a map of all field errors.
+1. Mark a class with `#[Dto]` and add validation attributes to its constructor parameters.
+2. Pass raw data (a decoded JSON body, form fields, etc.) to `$hydrator->hydrate()`.
+3. The Hydrator maps and casts the data, builds the object, then runs the Validator on it.
+
+Two different things can go wrong, and they are reported differently:
+
+| Problem | Exception | In the framework | Errors reported |
+|---|---|---|---|
+| The data doesn't fit the DTO's shape: a required field is missing, a value can't be cast to its type, or (with `#[Strict]`) an unknown field is sent | `HydrationException` | `400 Bad Request` | The **first** problem found |
+| The data fits, but breaks a validation rule (`#[Email]`, `#[MinLength]`, …) | `ValidationException` | `422 Unprocessable Entity` | **Every** failed rule, per field |
 
 ```php
+use Antares\Hydration\Exceptions\HydrationException;
 use Antares\Hydration\Hydrator;
+use Antares\Validation\Exceptions\ValidationException;
 use Antares\Validation\Validator;
 
 $hydrator = new Hydrator(new Validator());
 
 try {
     $dto = $hydrator->hydrate(CreateUserRequest::class, $rawData);
-} catch (ValidationException $e) {
-    $e->getErrors(); // ['email' => ['Must be a valid email address']]
 } catch (HydrationException $e) {
-    // raw data could not be mapped to the DTO shape
+    $e->getMessage(); // "Missing required parameter: email"
+} catch (ValidationException $e) {
+    $e->getErrors();  // ['email' => ['The value must be a valid email address.']]
 }
 ```
 
-In the framework, the Dispatcher handles this automatically for any parameter typed as a `#[Dto]` class.
+You can also validate any object directly, without hydrating it: `(new Validator())->validate($object)`. The Validator reads the rules from the class's constructor parameters.
+
+In the framework, the Dispatcher does all of this automatically for any controller parameter typed as a `#[Dto]` class.

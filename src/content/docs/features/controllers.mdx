@@ -40,7 +40,7 @@ public function show(int $id): array
 }
 ```
 
-Supported types: `int`, `float`, `bool`, `string`.
+Supported types: `int`, `float`, `bool`, `string`. A value that doesn't fit the type (`/users/abc` for `int $id`) is rejected with `400 Bad Request`.
 
 ---
 
@@ -58,11 +58,14 @@ public function index(int $page = 1, int $perPage = 15): array
 
 `GET /users?page=2&perPage=50` injects `$page = 2` and `$perPage = 50`.
 
+- Only `int`, `float`, `bool` and `string` parameters are read from the query string, cast the same way as route parameters. Invalid values are rejected with `400`, and so are array values such as `?page[]=1` (`Query parameter page must be a single value.`).
+- If the query parameter is missing, the default value is used. **Always give query parameters a default**: a missing parameter without one fails with `500` (`Cannot resolve parameter $page in controller.`, visible with `APP_DEBUG` on), even when the parameter is nullable.
+
 ---
 
 ## Request Body
 
-Type-hint a `#[Dto]` class to have the request body decoded, hydrated, and validated automatically. If validation fails, a `422` response is returned before your method is ever called:
+Type-hint a `#[Dto]` class to have the request body decoded, hydrated, and validated automatically. If the body is missing fields or has values of the wrong type, a `400` response is returned; if it breaks a validation rule, a `422`. Either way your method is never called:
 
 ```php
 #[Post('/users', 201)]
@@ -94,13 +97,16 @@ public function debug(ServerRequestInterface $request): array
 
 ## File Uploads
 
-Type-hint `UploadedFileInterface` and name the parameter to match the form field:
+Type-hint `UploadedFileInterface` and name the parameter to match the form field. If the request has no file field with that name, or several files under that name (`avatar[]`), it is rejected with `400`. Add [`#[File]`](/packages/validation/attributes/#file-uploads) to check size, MIME type and extension:
 
 ```php
+use Antares\Validation\Attributes\File;
 use Psr\Http\Message\UploadedFileInterface;
 
 #[Post('/avatars', 201)]
-public function upload(UploadedFileInterface $avatar): array
+public function upload(
+    #[File(maxSize: 2048, mimes: ['image/png', 'image/jpeg'])] UploadedFileInterface $avatar,
+): array
 {
     $avatar->moveTo('/storage/avatars/' . uniqid() . '.jpg');
     return ['uploaded' => true];
@@ -117,8 +123,12 @@ The return value of your method determines the response:
 |---|---|
 | `array` | JSON response with the route's status code |
 | `#[ResponseDto]` object | Serialized to JSON via the Serializer |
-| `ResponseInterface` | Returned as-is |
+| `ResponseInterface` | Returned as-is (headers from [`ResponseBag`](/core/dispatcher/#responsebag) are still added) |
 | `null` / `void` | Empty body with the route's status code |
+| A scalar (`string`, `int`, …) | JSON-encoded, e.g. `"ok"` |
+| Any other object | Error: `500`, *Controller returned an object without #[ResponseDto]* |
+
+JSON responses get `Content-Type: application/json`.
 
 ### Array
 
@@ -168,7 +178,7 @@ public function health(): Response
 
 ## Container Dependencies
 
-Any non-builtin type that isn't a DTO, guard, or PSR type is resolved from the container. This is how you inject services:
+Controllers are built by the container, so constructor dependencies are autowired. Method parameters work too: any class type that isn't a `#[Dto]`, a PSR request or file, or a parameter with `#[Guard]` / `#[Inject]` is resolved from the container.
 
 ```php
 class PostController

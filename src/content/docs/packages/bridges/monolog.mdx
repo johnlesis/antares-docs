@@ -21,7 +21,9 @@ Set these in your `.env`:
 | `LOG_LEVEL` | `debug` | Any PSR-3 level (`debug`, `info`, `warning`, `error`, …) |
 | `APP_NAME` | `antares` | Logger channel name |
 
-When `LOG_CHANNEL=file`, logs are written to `storage/logs/app.log` with daily rotation (30-day retention).
+When `LOG_CHANNEL=file` (or any value other than `stdout` / `stderr`), logs are written to `storage/logs/app.log` under the app's base path, rotated daily and kept for 30 days.
+
+The bridge registers `Psr\Log\LoggerInterface` and `Monolog\Logger` as singletons; both return the same logger.
 
 ## Usage
 
@@ -38,7 +40,7 @@ class UserService
 
     public function create(CreateUserRequest $request): User
     {
-        $user = User::create($request->toArray());
+        $user = User::create(['name' => $request->name, 'email' => $request->email]);
         $this->logger->info('User created', ['id' => $user->id]);
         return $user;
     }

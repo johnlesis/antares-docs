@@ -3,7 +3,11 @@ title: CLI
 description: Antares command-line tools
 ---
 
-Antares ships with a small CLI at `bin/antares` for scaffolding, migrations, and cache management.
+Antares ships with a small CLI for scaffolding, migrations, and cache management. Run it from your **project root**: every command reads and writes paths relative to the current directory.
+
+```bash
+php bin/antares            # lists all commands
+```
 
 ## Generator Commands
 
@@ -16,7 +20,20 @@ php bin/antares make:guard JwtGuard
 php bin/antares make:migration create_users_table
 ```
 
-Each command creates a file in the appropriate subdirectory with the correct namespace, imports, and stub implementation.
+| Command | Creates | Namespace |
+|---|---|---|
+| `make:controller` | `app/Controllers/{Name}.php` | `App\Controllers` |
+| `make:dto` | `app/DTOs/{Name}.php`, with `#[Dto]` | `App\DTOs` |
+| `make:response` | `app/Responses/{Name}.php`, with `#[ResponseDto(case: CaseStyle::SnakeCase)]` | `App\Responses` |
+| `make:middleware` | `app/Middleware/{Name}.php` | `App\Middleware` |
+| `make:guard` | `app/Guards/{Name}.php` | `App\Guards` |
+| `make:migration` | `database/migrations/{Y_m_d_His}_{name}.php` | none |
+
+Existing files are never overwritten. Pass `--path=` to write somewhere else (relative to the project root); the namespace in the file stays the same, so adjust it if needed:
+
+```bash
+php bin/antares make:dto CreateUserRequest --path=app/Http/Requests
+```
 
 ## Migration Commands
 
@@ -33,8 +50,8 @@ php bin/antares migrate:rollback
 php bin/antares cache:clear
 ```
 
-Deletes the compiled route cache (`storage/cache/routes.php`) and the fingerprint file (`storage/cache/fingerprint`). The cache is rebuilt on the next request.
+Deletes the compiled route cache (`storage/cache/routes.php`) and the fingerprint file (`storage/cache/fingerprint`). The cache is rebuilt on the next boot.
 
 :::tip
-You do not need to run `cache:clear` after every deploy — the fingerprint-based invalidation handles that automatically when `composer.lock`, `.env`, or any file in `app/` changes.
+You do not need to run `cache:clear` after every deploy: the fingerprint-based invalidation handles that automatically when `composer.lock`, `.env`, or any file in `app/` changes.
 :::

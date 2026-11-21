@@ -5,7 +5,7 @@ description: Defining request DTOs and hydrating them from raw data
 
 ## Defining a DTO
 
-Annotate a readonly class with `#[Dto]` and declare constructor parameters with validation attributes:
+Mark a class with `#[Dto]` and declare its fields as constructor parameters, with validation attributes on them. `readonly` is recommended but not required:
 
 ```php
 use Antares\Validation\Attributes\Dto;
@@ -32,6 +32,8 @@ readonly class CreateUserRequest
 }
 ```
 
+Validation rules are read from **constructor parameters**, so use promoted properties (`public string $name` in the constructor).
+
 ## Hydrating
 
 ```php
@@ -43,24 +45,50 @@ $dto->email; // 'john@example.com'
 $dto->role;  // 'viewer' (default)
 ```
 
+## How Each Field Is Filled
+
+For each constructor parameter, the Hydrator looks up the key with the same name in the data:
+
+| Situation | Result |
+|---|---|
+| Key missing, parameter has a default | The default is used |
+| Key missing, parameter is nullable | `null` |
+| Key missing otherwise | `HydrationException`: `Missing required parameter: name` |
+| Value is `null` | `null` if the parameter is nullable, otherwise `HydrationException`: `Parameter name must not be null.` |
+| `int` / `float` | The value must pass PHP's integer / float check (`"42"` is accepted and becomes `42`), otherwise `HydrationException` |
+| `bool` | The value must be a recognisable boolean: `true`/`false`, `1`/`0`, `"true"`/`"false"`, `"yes"`/`"no"`, `"on"`/`"off"`, otherwise `HydrationException` |
+| `string` | A string, or a number (cast to string). Arrays, objects and booleans are rejected with `HydrationException` |
+| A class marked `#[Dto]` | Hydrated recursively; the value must be an object (array), otherwise `HydrationException` |
+| `array` | Must be an array, otherwise `HydrationException` |
+| Untyped, `mixed`, or union types | Passed through unchanged |
+
+A parameter typed as a class **without** `#[Dto]` (e.g. `DateTimeImmutable`), or a DTO class without a constructor, is a mistake in the DTO itself rather than in the request. It throws a `LogicException`, which the framework turns into a hidden `500` and logs.
+
+Unknown keys are ignored, unless the DTO has `#[Strict]`.
+
 ## Strict Mode
 
-Add `#[Strict]` to enable strict type checking during hydration. Without it, the hydrator coerces compatible types (e.g. `"42"` → `42`). With it, a type mismatch throws a `HydrationException`:
+Add `#[Strict]` to reject any field the DTO doesn't declare. The request fails with a `HydrationException` (`400`) listing the unknown fields:
 
 ```php
+use Antares\Validation\Attributes\Strict;
+
 #[Dto]
 #[Strict]
-readonly class StrictRequest
+readonly class CreateUserRequest
 {
     public function __construct(
-        public int $count,
+        public string $name,
+        public string $email,
     ) {}
 }
 ```
 
+Sending `{"name": "John", "email": "john@example.com", "role": "admin"}` fails with `Unknown fields: role`. `#[Strict]` does not change how values are cast.
+
 ## Nested DTOs
 
-DTOs can contain other `#[Dto]` classes as nested properties. The hydrator recurses into them automatically:
+A parameter typed as another `#[Dto]` class is hydrated from the nested array:
 
 ```php
 #[Dto]
@@ -81,3 +109,9 @@ readonly class CreateOrderRequest
     ) {}
 }
 ```
+
+The nested DTO is validated as soon as it is built, before its parent. If it fails, its errors are reported under the nested field names (`{"street": [...]}`, not `address.street`), and the parent's own rules are not checked in that run.
+
+## Arrays
+
+An `array` parameter is passed through as-is. Use `#[ArrayOf('string')]` (or `'int'`, `'float'`, `'bool'`, `'array'`) to check the items' types. Arrays of DTOs are not hydrated: `#[ArrayOf(ItemRequest::class)]` expects objects, but the request contains plain arrays, so it will always fail.

@@ -72,6 +72,8 @@ Antares uses `vlucas/phpdotenv` to load environment variables. Create a `.env` f
 ```env
 APP_ENV=local
 APP_NAME=my-app
+# APP_DEBUG=true  # error details in 500 responses: on by default, off when APP_ENV=production
+# APP_DOCS=true   # /openapi.json and /docs: on by default, off when APP_ENV=production
 
 DB_DRIVER=mysql
 DB_HOST=127.0.0.1

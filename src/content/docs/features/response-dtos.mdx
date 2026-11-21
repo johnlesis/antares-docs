@@ -106,7 +106,7 @@ readonly class PostResponse
 
 ## Computed Fields
 
-Use `#[Computed]` on a public method to include its return value as a field in the response. The method name becomes the key, converted using the DTO's case setting:
+Use `#[Computed]` on a public method to include its return value as a field in the response. The method name becomes the key: a leading `get` is removed (`getFullName()` becomes `fullName`), then the DTO's case setting is applied. `#[SerializeAs]` doesn't apply to computed fields:
 
 ```php
 use Antares\Serialization\Attributes\Computed;
@@ -141,10 +141,13 @@ readonly class PostResponse
 
 ## Case Conversion
 
-By default property names are output in `camelCase`. Pass a `case` argument to `#[ResponseDto]` to change this:
+By default property names are output in `camelCase`. Pass a `CaseStyle` to the `case` argument of `#[ResponseDto]` to change this:
 
 ```php
-#[ResponseDto(case: 'snake_case')]
+use Antares\Serialization\Attributes\ResponseDto;
+use Antares\Serialization\CaseStyle;
+
+#[ResponseDto(case: CaseStyle::SnakeCase)]
 readonly class UserResponse
 {
     public function __construct(
@@ -163,7 +166,49 @@ readonly class UserResponse
 }
 ```
 
-Available values: `'snake_case'`, `'pascal_case'`, and `'kebab_case'`. `#[SerializeAs]` always takes precedence over the case setting for any specific field.
+| `CaseStyle` | `firstName` becomes |
+|---|---|
+| `CaseStyle::CamelCase` (default) | `firstName` |
+| `CaseStyle::SnakeCase` | `first_name` |
+| `CaseStyle::PascalCase` | `FirstName` |
+| `CaseStyle::KebabCase` | `first-name` |
+
+`#[SerializeAs]` always takes precedence over the case setting for any specific field.
+
+:::caution[Changed in 0.2]
+`case` used to take a string such as `'snake_case'`. It now takes the `CaseStyle` enum, so a typo is caught by PHP instead of silently falling back to camelCase. See [Upgrading to 0.2](/getting-started/upgrading/).
+:::
+
+---
+
+## Nested Response DTOs
+
+A property holding another `#[ResponseDto]` object is serialized recursively, using **that** class's own case setting. Arrays are walked too, so an array of response DTOs becomes an array of JSON objects:
+
+```php
+#[ResponseDto(case: CaseStyle::SnakeCase)]
+readonly class OrderResponse
+{
+    public function __construct(
+        public int $id,
+        public CustomerResponse $customer,   // serialized with CustomerResponse's rules
+        /** @var LineItemResponse[] */
+        public array $lineItems,             // each item serialized
+    ) {}
+}
+```
+
+Other values are left to `json_encode`: scalars, `null` and arrays are output as they are. A plain object without `#[ResponseDto]`, such as a `DateTimeImmutable`, is **not** converted; `json_encode` outputs its public properties. Format dates as strings before putting them in the DTO.
+
+---
+
+## What Gets Serialized
+
+- **Every property** of the object, including `private`, `protected` and properties not declared in the constructor, unless it has `#[Hide]`. `null` values are included as `null`.
+- Every method marked `#[Computed]`.
+- The controller must return an object with `#[ResponseDto]`; returning any other object fails with `500`.
+
+The [OpenAPI schema](/features/openapi/) is built from **constructor parameters** only, so declare all output fields in the constructor to keep the docs and the real output in sync.
 
 ---
 
@@ -174,8 +219,9 @@ use Antares\Serialization\Attributes\ResponseDto;
 use Antares\Serialization\Attributes\Hide;
 use Antares\Serialization\Attributes\SerializeAs;
 use Antares\Serialization\Attributes\Computed;
+use Antares\Serialization\CaseStyle;
 
-#[ResponseDto(case: 'snake_case')]
+#[ResponseDto(case: CaseStyle::SnakeCase)]
 readonly class ArticleResponse
 {
     public function __construct(

@@ -34,7 +34,7 @@ $container->make(A::class);
 // ContainerException: Circular dependency detected: A
 ```
 
-Fix: break the cycle by introducing an interface, a factory, or by making one dependency optional.
+Fix: break the cycle, for example by introducing an interface or a factory. Making a class-typed dependency optional (`?B $b = null`) does **not** help, because class-typed parameters are always resolved from the container.
 
 ## Unresolvable Primitive
 
@@ -49,7 +49,7 @@ class Mailer {
 }
 
 $container->make(Mailer::class);
-// ContainerException: Cannot resolve primitive parameter $host in Mailer.
+// ContainerException: Cannot resolve primitive parameter $host in Mailer. Register it as a singleton with explicit values.
 ```
 
 Fix: register as a singleton with explicit values:
@@ -60,3 +60,13 @@ $container->singleton(Mailer::class, fn() => new Mailer(
     port: (int) $_ENV['MAIL_PORT'],
 ));
 ```
+
+## Parameter Without a Type
+
+A constructor parameter with no type hint and no default value cannot be resolved either:
+
+```php
+// ContainerException: Parameter $config in Mailer has no type hint and no default value.
+```
+
+Fix: add a type, a default value, or register the class as a singleton.

@@ -16,9 +16,8 @@ interface ServiceProvider
 
 Use providers to bind interfaces to concrete implementations and register singletons for classes that need primitive constructor arguments (like values from `.env`)
 
-scoped works like singleton but the instance is cleared after each request. Use it for classes that should not persist state across requests when running in worker mode (Swoole, FrankenPHP):
+`scoped()` works like `singleton()`, but the instance is thrown away at the start of every request. Use it for classes that hold per-request state when running in worker mode (Swoole, FrankenPHP). Under PHP-FPM the distinction does not matter, since the process ends after every request. See [Bindings & Singletons](/packages/container/bindings/#scoped-instances).
 
-In PHP-FPM the distinction does not matter since the process dies after every request anyway.
 ```php
 use Antares\ServiceProvider;
 use Antares\Container\Container;
@@ -48,7 +47,8 @@ class AppServiceProvider implements ServiceProvider
 
 ## Route Providers
 
-Route providers call $router->register() with each of your controller classes. The router inspects the class via reflection and registers all methods annotated with route attributes:
+Route providers call `$router->register()` with each of your controller classes. The router inspects the class via reflection and registers all methods annotated with route attributes:
+
 ```php
 use Antares\ServiceProvider;
 use Antares\Container\Container;
@@ -67,12 +67,16 @@ class RouteServiceProvider implements ServiceProvider
 }
 ```
 
+:::caution
+In production (`APP_ENV=production`), when the [route cache](/packages/router/caching/) is valid, route providers are **skipped entirely**. Only register routes in them. Container bindings belong in a regular provider passed to `->providers([...])`.
+:::
+
 #### Array Config
 
-Alternatively, define routes in config/routes.php and load them with registerFromConfig():
-```php
+Alternatively, define routes in `config/routes.php` and load them with `registerFromConfig()`:
 
-config/routes.php
+```php
+// config/routes.php
 return [
     ['GET',    '/users',      UserController::class, 'index',   200],
     ['POST',   '/users',      UserController::class, 'store',   201],
@@ -86,11 +90,13 @@ $router->registerFromConfig(require __DIR__ . '/../config/routes.php');
 ```
 
 #### YAML Config
-Supported via symfony/yaml:
+Supported via `symfony/yaml`:
+
 ```bash
 composer require symfony/yaml
 ```
-```yaml# config/routes.yaml
+```yaml
+# config/routes.yaml
 routes:
   - method: GET
     path: /users
@@ -110,7 +116,7 @@ $router->registerFromYaml(__DIR__ . '/../config/routes.yaml');
 
 ## Bridge Auto-Discovery
 
-Bridge packages declare their providers in `composer.json` and are registered automatically — you do not need to add them to `->providers([...])`:
+Bridge packages declare their providers in `composer.json` and are registered automatically, so you don't add them to `->providers([...])`. Antares reads them from `vendor/composer/installed.json` on boot and registers them **before** your own providers, so a binding in your provider replaces the bridge's:
 
 ```json
 "extra": {

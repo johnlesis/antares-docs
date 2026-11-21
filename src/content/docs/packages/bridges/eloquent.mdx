@@ -9,7 +9,7 @@ The Eloquent bridge wires up Laravel's Eloquent ORM using `Illuminate\Database\C
 composer require fatjon-lleshi/antares-eloquent-bridge
 ```
 
-The bridge is auto-discovered — no manual registration needed.
+The bridge is auto-discovered — no manual registration needed. It configures one connection and boots Eloquent globally on every app boot, so models work anywhere.
 
 ## Configuration
 
@@ -17,7 +17,7 @@ Set these in your `.env`:
 
 | Variable | Default | Description |
 |---|---|---|
-| `DB_DRIVER` | `mysql` | Database driver (`mysql`, `pgsql`, `sqlite`) |
+| `DB_DRIVER` | `mysql` | Any driver Laravel's database layer supports (`mysql`, `pgsql`, `sqlite`, `sqlsrv`) |
 | `DB_HOST` | `127.0.0.1` | Database host |
 | `DB_PORT` | `3306` | Database port |
 | `DB_DATABASE` | `` | Database name |
@@ -40,7 +40,7 @@ class User extends Model
 }
 ```
 
-Inject `Capsule` or `DatabaseManager` via the container:
+Inject `Capsule` or `DatabaseManager` via the container when you need the query builder or a raw connection:
 
 ```php
 use Illuminate\Database\Capsule\Manager as Capsule;
