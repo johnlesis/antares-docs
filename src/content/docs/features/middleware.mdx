@@ -76,7 +76,9 @@ Application::create(__DIR__ . '/..')
 
 ## Pipeline Internals
 
-The `Pipeline` wraps middleware around the Dispatcher using a recursive closure. The Dispatcher is always the innermost destination. Error handling wraps the entire pipeline, so an exception thrown in middleware becomes a normal error response too.
+The `Pipeline` wraps middleware around the Dispatcher using a recursive closure. The Dispatcher is always the innermost destination.
+
+Errors from routing, guards, DTOs and controllers are turned into an [error response](/features/error-handling/) *inside* the pipeline, so **error responses pass back through your middleware** like any other response. A CORS middleware, for example, adds its headers to a `404` or `422` as well, so browser clients can read the error. An exception thrown by a middleware itself is also turned into an error response, but the middleware outside it don't see that response.
 
 Middleware runs for **every** request, before the route is matched, including requests for routes that don't exist.
 

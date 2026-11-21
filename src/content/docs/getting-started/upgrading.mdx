@@ -3,7 +3,7 @@ title: Upgrading to 0.2
 description: Breaking changes and how to update a 0.1 app
 ---
 
-0.2 has one breaking code change and two changed defaults. Most apps upgrade in a few minutes.
+0.2 has one breaking code change and two changed defaults. Apps written for 0.1.3 or earlier have one more rename to make (step 3). Most apps upgrade in a few minutes.
 
 ## 1. Update the packages
 
@@ -37,7 +37,19 @@ A string now fails with a `TypeError` when the response is serialized, so search
 
 If you call `CaseConverter::convert()` directly, pass a `CaseStyle` there too.
 
-## 3. OpenAPI docs are off in production by default
+## 3. Guards were renamed (only if you're coming from 0.1.3 or earlier)
+
+0.1.4 renamed the guard attribute and moved the guard interface. If your app still uses the old names, PHP fails with *Class "Antares\Http\Attributes\Guards" not found*:
+
+| Old (0.1.3 and earlier) | New (0.1.4 and later) |
+|---|---|
+| `use Antares\Http\Attributes\Guards;` | `use Antares\Http\Attributes\Guard;` |
+| `#[Guards(AuthGuard::class)]` | `#[Guard(AuthGuard::class)]` |
+| `use Antares\Http\Guards\Guard;` (in your guard classes) | `use Antares\Http\ResolverInterfaces\Guard;` |
+
+A find-and-replace of those three lines is enough; the guard classes themselves don't change.
+
+## 4. OpenAPI docs are off in production by default
 
 In 0.1, `/openapi.json` and `/docs` were registered in every environment. In 0.2 they are **off when `APP_ENV=production`**, so your production API no longer publishes its own map.
 
@@ -49,7 +61,7 @@ APP_DOCS=true
 
 Nothing changes locally. See [OpenAPI](/features/openapi/#turning-the-docs-on-or-off) for every option.
 
-## 4. Unexpected errors are hidden in production
+## 5. Unexpected errors are hidden in production
 
 In 0.1, every error response showed the exception's message, so a database error could reach your users. In 0.2, only errors meant for the client show their message: `HttpException`, validation and hydration errors, unknown routes, and anything you mark as safe. **Every other exception becomes `500 Internal Server Error`** with no details, and is logged.
 
