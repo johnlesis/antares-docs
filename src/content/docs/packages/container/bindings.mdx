@@ -59,7 +59,7 @@ $container->clearScoped();
 $c = $container->make(RequestContext::class); // a fresh instance
 ```
 
-The framework's Dispatcher calls `clearScoped()` at the start of every request. Use `scoped()` for anything that holds per-request state (the current user, tenant, request ID) so it never leaks into the next request under a worker runtime such as Swoole or FrankenPHP. Under PHP-FPM, `scoped()` and `singleton()` behave the same, because the process ends after each request.
+The framework calls `clearScoped()` at the start of every request, before any middleware runs, so middleware and controllers in the same request share one instance. Use `scoped()` for anything that holds per-request state (the current user, tenant, request ID) so it never leaks into the next request under a worker runtime such as Swoole or FrankenPHP. Under PHP-FPM, `scoped()` and `singleton()` behave the same, because the process ends after each request.
 
 ## Lookup Order
 
