@@ -36,6 +36,7 @@ export default defineConfig({
           label: 'Getting Started',
           items: [
             { label: 'Introduction', slug: 'getting-started/introduction' },
+            { label: 'Why Antares', slug: 'getting-started/why-antares' },
             { label: 'Installation', slug: 'getting-started/installation' },
             { label: 'Quick Start', slug: 'getting-started/quick-start' },
             { label: 'Upgrading to 0.2', slug: 'getting-started/upgrading' },

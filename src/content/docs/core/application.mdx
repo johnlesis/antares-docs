@@ -29,7 +29,7 @@ Registers route providers. These are responsible for calling `$router->register(
 ->middleware(array $middleware): static
 ```
 
-Registers global middleware. Middleware runs in order on every request, wrapping the Dispatcher as the innermost layer. Middleware is created with `new` on each request, not by the container, so it can't take constructor dependencies. See [Middleware](/features/middleware/).
+Registers global middleware. Middleware runs in order on every request, wrapping the Dispatcher as the innermost layer. Middleware is resolved through the container, so it can take constructor dependencies (from v0.2.4). See [Middleware](/features/middleware/).
 
 ```php
 ->exceptions(array $map): static

@@ -9,7 +9,13 @@ Antares middleware uses its own small interface, `handle(ServerRequestInterface 
 
 ## Writing Middleware
 
-Implement `Antares\Middleware\MiddlewareInterface`:
+Generate a class with the CLI:
+
+```bash
+php vendor/bin/antares make:middleware CorsMiddleware
+```
+
+This creates `app/Middleware/CorsMiddleware.php`, implementing `Antares\Middleware\MiddlewareInterface`. The example below is a CORS middleware you write yourself; Antares doesn't ship one. `CorsConfig` is your own class, injected through the constructor (see [Dependency Injection](#dependency-injection)):
 
 ```php
 <?php
@@ -18,6 +24,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Config\CorsConfig;
 use Antares\Middleware\MiddlewareInterface;
 use Nyholm\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
@@ -25,39 +32,64 @@ use Psr\Http\Message\ServerRequestInterface;
 
 final class CorsMiddleware implements MiddlewareInterface
 {
-    private array $config;
-
-    public function __construct()
-    {
-        $this->config = require __DIR__ . '/../../config/cors.php';
-    }
+    public function __construct(private CorsConfig $config) {}
 
     public function handle(ServerRequestInterface $request, callable $next): ResponseInterface
     {
+        $headers = [
+            'Access-Control-Allow-Origin'      => $this->config->origin,
+            'Access-Control-Allow-Methods'     => $this->config->methods,
+            'Access-Control-Allow-Headers'     => $this->config->headers,
+            'Access-Control-Allow-Credentials' => $this->config->credentials ? 'true' : 'false',
+        ];
+
         if ($request->getMethod() === 'OPTIONS') {
-            return new Response(204, [
-                'Access-Control-Allow-Origin'      => $this->config['origin'],
-                'Access-Control-Allow-Methods'     => $this->config['methods'],
-                'Access-Control-Allow-Headers'     => $this->config['headers'],
-                'Access-Control-Max-Age'           => $this->config['max_age'],
-                'Access-Control-Allow-Credentials' => $this->config['credentials'] ? 'true' : 'false',
+            return new Response(204, $headers + [
+                'Access-Control-Max-Age' => (string) $this->config->maxAge,
             ]);
         }
 
-        $response = $next($request);
+        $response = $next($request)
+            ->withHeader('Access-Control-Expose-Headers', $this->config->exposedHeaders);
 
-        return $response
-            ->withHeader('Access-Control-Allow-Origin', $this->config['origin'])
-            ->withHeader('Access-Control-Allow-Methods', $this->config['methods'])
-            ->withHeader('Access-Control-Allow-Headers', $this->config['headers'])
-            ->withHeader('Access-Control-Expose-Headers', $this->config['exposed_headers'])
-            ->withHeader('Access-Control-Allow-Credentials', $this->config['credentials'] ? 'true' : 'false');
+        foreach ($headers as $name => $value) {
+            $response = $response->withHeader($name, $value);
+        }
+
+        return $response;
     }
 }
 ```
 
-:::caution[No constructor dependencies]
-Middleware is created with `new YourMiddleware()` on every request, **not** through the container. Its constructor can't take arguments, so services can't be injected. Load configuration inside the constructor, as above, or move logic that needs services into a [guard or resolver](/features/guards/), which are built by the container.
+## Dependency Injection
+
+Middleware is resolved through the container, the same way as controllers and guards, so constructor dependencies are injected automatically. Class-typed parameters are autowired; values that need primitives (like settings from `.env`) are registered as a singleton in a [service provider](/features/service-providers/):
+
+```php
+use App\Config\CorsConfig;
+use Antares\ServiceProvider;
+use Antares\Container\Container;
+
+class AppServiceProvider implements ServiceProvider
+{
+    public function register(Container $container): void
+    {
+        $container->singleton(CorsConfig::class, fn() => new CorsConfig(
+            origin: $_ENV['CORS_ORIGIN'] ?? '*',
+            methods: 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+            headers: 'Content-Type, Authorization',
+            exposedHeaders: '',
+            maxAge: 86400,
+            credentials: false,
+        ));
+    }
+}
+```
+
+A new middleware instance is built for every request. To reuse one instance, register the middleware itself as a `singleton()`. In worker mode (Swoole, FrankenPHP) a singleton lives across requests, so it must not keep per-request state; use `scoped()` for that. See [Bindings & Singletons](/packages/container/bindings/#scoped-instances).
+
+:::note
+Constructor injection for middleware is available from **v0.2.4**. In earlier versions middleware was created with `new` and couldn't take constructor arguments.
 :::
 
 ## Registering Middleware

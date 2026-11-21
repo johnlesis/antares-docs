@@ -1,0 +1,36 @@
+---
+title: Why Antares
+description: The vision behind Antares, in the author's own words.
+---
+
+Hello, my name is Fatjon, and I'd like to share my vision for this project.
+
+First of all, it's about community. Talking with your peers, contributing, sharing ideas: I think that's the best way to learn. I love talking about software engineering and how to make it better. Our profession changes day to day, and keeping up is sometimes really hard, but understanding the fundamentals has always been my number one priority.
+
+When I started working in the field, I was honestly a bit confused about how a lot of the things we use every day actually work. So I decided that building a framework myself would clear some of that up in my head.
+
+Around that time I gave Python a try, FastAPI in particular, and I was amazed by some of the things it gives you out of the box, things that feel essential for building APIs nowadays. You define the request and the response, and you get docs automatically. You can give a route a dependency that gets resolved for you with `Depends()`. And the error messages actually make sense: you get the full list of what's wrong, not just the first error it ran into.
+
+So I went looking. Is there something lightweight in PHP that does this? The big, established frameworks cover a lot of ground, but these features feel bolted on rather than being what the framework was made for. That made the decision easy, and a win-win: I get to learn the internals of a framework, and I get to build something I find useful myself.
+
+## What I want to achieve
+
+Picture this: you get the documentation for an API you want to add to your microservices. You can see the contracts it needs. You write your DTOs, fully typed, and the hydrator builds the object for you. If one or more things aren't what you defined, the contract breaks and you get a useful message telling you exactly what's wrong, for every field, not just the first one.
+
+The same goes for the response. You shape what you want to return, what you want to hide, what it's called, and more.
+
+And the best part? You get the docs for free.
+
+## Guards
+
+One idea I'm especially happy with is a kind of per-route middleware. I called it a [Guard](/features/guards/), because it guards an endpoint and stops a request from going any deeper than it needs to.
+
+Why do this? Because middleware is applied globally, and I wanted something more modular. I'm sure you can do something similar by attaching a middleware to a single endpoint, but I liked my approach better. A guard also hands what it resolved straight to your controller: if it checks a token, your method just receives the user, a bit like `Depends()` in FastAPI.
+
+## Opinionated, on purpose
+
+I know Antares is opinionated. To achieve what I wanted, it had to be.
+
+If any of this resonates with you, come and talk: open an issue, share an idea, or send a pull request on [GitHub](https://github.com/johnlesis/antares-framework). That's what this project is about.
+
+— Fatjon

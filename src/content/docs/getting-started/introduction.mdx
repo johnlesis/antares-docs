@@ -3,21 +3,20 @@ title: Introduction
 description: Antares — a lightweight, API-focused PHP framework for PHP 8.2+
 ---
 
-Antares is a lightweight, API-focused PHP framework built around **explicitness**, **type safety**, and **contract-first design**. 
+Antares is a lightweight, API-focused PHP framework built around **explicitness**, **type safety**, and **contract-first design**.
 
-It provides everything you need to build a modern JSON API — a DI container, attribute-based routing, DTO hydration & validation, Response serialization, a middleware pipeline, 
+You describe each endpoint with typed classes: a request DTO for what comes in, a response DTO for what goes out. From that one contract, Antares validates every request, serializes every response, and generates your OpenAPI spec and Swagger docs. You declare it once and it can't drift. For the story and vision behind it, read [Why Antares](/getting-started/why-antares/).
 
-And auto-generated OpenAPI docs — with zero magic and no hidden conventions.
+It provides everything you need to build a modern JSON API — a DI container, attribute-based routing, DTO hydration & validation, response serialization, a middleware pipeline and auto-generated OpenAPI docs — with zero magic and no hidden conventions.
 
 ## Philosophy
 
-- **Explicit over implicit.** Every request and response is typed. Routes are defined where you can see them — attributes, array config, or YAML.
+- **Contract-first.** Typed requests in, typed responses out. Validation, serialization and docs are all derived from the same classes.
+- **Explicit over implicit.** Routes are defined where you can see them — attributes, array config, or YAML. No naming conventions that change behaviour silently.
 - **Type-safe by default.** PHP 8.2+ typed DTOs, hydration that casts and checks every field, and reflection-based resolution throughout.
-- **Composable packages.** Each concern lives in its own Composer package. Use the full framework or pull in only what you need.
-- **No configuration tax.** Route caching and cache invalidation in Production, bridge auto-discovery
+- **Composable packages.** Each concern lives in its own Composer package. Use the full framework or pull in just the container, router, or validation package.
+- **No configuration tax.** Route caching and cache invalidation in production, and bridge auto-discovery.
 - **Zero bootstrap overhead.** Built for worker runtimes — Swoole and FrankenPHP keep the app alive between requests.
-- **Composable.** Use the full framework or pull in just the container, router, or validation package independently.
-- **OpenAPI included.**  You define the contract — typed requests in, typed responses out. The docs write themselves.
 
 ## Packages
 
