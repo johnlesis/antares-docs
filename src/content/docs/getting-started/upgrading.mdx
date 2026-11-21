@@ -70,6 +70,9 @@ These need no changes on your side:
 - **FrankenPHP worker mode** keeps the app booted between requests. In 0.1, `runWorker()` handled one request per worker start.
 - **`#[DateTimeImmutable]`** can be used; in 0.1 it couldn't be autoloaded.
 - **`make:guard`** generates a guard that implements the right interface.
+- **Real environment variables are respected.** In 0.1, a variable set outside `.env` (by Docker, systemd, or your shell) was invisible to the framework. In particular, a real `APP_ENV=production` is now seen, which also turns off docs and debug output by default.
+- **The CLI loads `.env`**, so `migrate` uses your `DB_*` settings.
+- **Migrations connect to SQL Server, Oracle and SQLite**, not only MySQL and PostgreSQL, and `DB_DSN` accepts any PDO connection string.
 
 - **Query parameters** are documented in the OpenAPI spec.
 - **`#[Computed]` fields** appear in response schemas.

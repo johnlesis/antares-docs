@@ -7,25 +7,44 @@ Antares ships its own migration system built on raw PDO, with no ORM required. I
 
 ## Connection
 
-Migrations connect with these environment variables:
+Migrations connect with these variables from `.env` (or the real environment, which wins):
 
-| Variable | Default |
+| Variable | Default | Notes |
+|---|---|---|
+| `DB_DRIVER` | `mysql` | `mysql`, `pgsql`, `sqlite`, `sqlsrv` or `oci` (Oracle) |
+| `DB_HOST` | `127.0.0.1` | Not used for SQLite |
+| `DB_PORT` | the driver's default | `3306`, `5432`, `1433` or `1521` |
+| `DB_DATABASE` | (empty) | Database name; the **file path** for SQLite; the **service name** for Oracle |
+| `DB_USERNAME` | (empty) | |
+| `DB_PASSWORD` | (empty) | |
+| `DB_CHARSET` | `utf8mb4` | MySQL only |
+| `DB_DSN` | (none) | A complete PDO connection string, used instead of all of the above except username and password |
+
+The connection string is built for each driver:
+
+| `DB_DRIVER` | Connection string |
 |---|---|
-| `DB_DRIVER` | `mysql` |
-| `DB_HOST` | `127.0.0.1` |
-| `DB_PORT` | `3306` |
-| `DB_DATABASE` | (empty) |
-| `DB_USERNAME` | (empty) |
-| `DB_PASSWORD` | (empty) |
+| `mysql` | `mysql:host=…;port=…;dbname=…;charset=…` |
+| `pgsql` | `pgsql:host=…;port=…;dbname=…` |
+| `sqlite` | `sqlite:{DB_DATABASE}` |
+| `sqlsrv` | `sqlsrv:Server={host},{port};Database=…` |
+| `oci` | `oci:dbname=//{host}:{port}/{service name}` |
 
-The connection string is built as `{DB_DRIVER}:host={DB_HOST};port={DB_PORT};dbname={DB_DATABASE}`, so **MySQL (`mysql`) and PostgreSQL (`pgsql`)** work. SQLite, SQL Server and Oracle use a different connection string format and can't connect yet.
+PHP needs the matching PDO extension (`pdo_mysql`, `pdo_pgsql`, `pdo_sqlite`, `pdo_sqlsrv` or `pdo_oci`). Use `DB_DSN` for anything else, such as an Oracle TNS name:
+
+```env
+DB_DRIVER=oci
+DB_DSN="oci:dbname=PROD_TNS;charset=AL32UTF8"
+```
+
+The `migrations` table needs Oracle 12c or newer (it uses an identity column).
 
 ---
 
 ## Creating a Migration
 
 ```bash
-php bin/antares make:migration create_users_table
+php vendor/bin/antares make:migration create_users_table
 ```
 
 This creates a file in `database/migrations/` with a timestamp prefix, e.g. `2026_01_15_103000_create_users_table.php`. It contains a plain class (no namespace, no base class) whose name is the file name without the timestamp, in PascalCase:
@@ -65,7 +84,7 @@ Keep the class name and file name in sync: the runner derives the class name fro
 Run all pending migrations:
 
 ```bash
-php bin/antares migrate
+php vendor/bin/antares migrate
 ```
 
 Migrations are tracked in a `migrations` table by file name. Already-run migrations are skipped, and everything run together is recorded as one batch.
@@ -77,7 +96,7 @@ Migrations are tracked in a `migrations` table by file name. Already-run migrati
 Roll back the last batch of migrations:
 
 ```bash
-php bin/antares migrate:rollback
+php vendor/bin/antares migrate:rollback
 ```
 
 Migrations in the last batch are rolled back in reverse order, calling each migration's `down()` method.
@@ -86,7 +105,7 @@ Migrations in the last batch are rolled back in reverse order, calling each migr
 
 ## How It Works
 
-- Migration files live in `database/migrations/` (relative to where you run the command)
+- Migration files live in `database/migrations/` (relative to where you run the command, normally the project root)
 - Files are sorted by name, so the timestamp prefix sets the order
 - The `migrations` table is created automatically on first run
 - Each migration receives a raw `PDO` instance, set to throw exceptions on errors

@@ -3,21 +3,21 @@ title: CLI
 description: Antares command-line tools
 ---
 
-Antares ships with a small CLI for scaffolding, migrations, and cache management. Run it from your **project root**: every command reads and writes paths relative to the current directory.
+Antares ships with a small CLI for scaffolding, migrations, and cache management. Run it from your **project root**: every command reads and writes paths relative to the current directory, and the project's `.env` is loaded from there. Real environment variables win over `.env`, so `DB_HOST=db.prod php vendor/bin/antares migrate` works.
 
 ```bash
-php bin/antares            # lists all commands
+php vendor/bin/antares            # lists all commands
 ```
 
 ## Generator Commands
 
 ```bash
-php bin/antares make:controller UserController
-php bin/antares make:dto CreateUserRequest
-php bin/antares make:response UserResponse
-php bin/antares make:middleware AuthMiddleware
-php bin/antares make:guard JwtGuard
-php bin/antares make:migration create_users_table
+php vendor/bin/antares make:controller UserController
+php vendor/bin/antares make:dto CreateUserRequest
+php vendor/bin/antares make:response UserResponse
+php vendor/bin/antares make:middleware AuthMiddleware
+php vendor/bin/antares make:guard JwtGuard
+php vendor/bin/antares make:migration create_users_table
 ```
 
 | Command | Creates | Namespace |
@@ -32,14 +32,14 @@ php bin/antares make:migration create_users_table
 Existing files are never overwritten. Pass `--path=` to write somewhere else (relative to the project root); the namespace in the file stays the same, so adjust it if needed:
 
 ```bash
-php bin/antares make:dto CreateUserRequest --path=app/Http/Requests
+php vendor/bin/antares make:dto CreateUserRequest --path=app/Http/Requests
 ```
 
 ## Migration Commands
 
 ```bash
-php bin/antares migrate
-php bin/antares migrate:rollback
+php vendor/bin/antares migrate
+php vendor/bin/antares migrate:rollback
 ```
 
 `migrate` runs all pending migrations in `database/migrations/`. `migrate:rollback` rolls back the last batch in reverse order. See [Migrations](/features/migrations) for details.
@@ -47,7 +47,7 @@ php bin/antares migrate:rollback
 ## Cache Commands
 
 ```bash
-php bin/antares cache:clear
+php vendor/bin/antares cache:clear
 ```
 
 Deletes the compiled route cache (`storage/cache/routes.php`) and the fingerprint file (`storage/cache/fingerprint`). The cache is rebuilt on the next boot.

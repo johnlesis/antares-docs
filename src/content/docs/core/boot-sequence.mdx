@@ -5,7 +5,7 @@ description: What happens when Antares boots
 
 `Application::boot()` runs once per process: on every request under PHP-FPM, and once at startup under Swoole. `run()`, `runSwoole()` and `runWorker()` call it for you. These steps execute in order:
 
-1. **Load `.env`.** `vlucas/phpdotenv` loads environment variables from the base path, without overwriting variables that are already set. A missing `.env` file is not an error. `APP_BASE_PATH` is set to the base path.
+1. **Load `.env`.** `vlucas/phpdotenv` loads environment variables from the base path, without overwriting variables that are already set. A missing `.env` file is not an error. Then the real environment (from Docker, systemd, your shell…) is copied into `$_ENV`, so a real variable always wins over `.env`. `APP_BASE_PATH` is set to the base path.
 
 2. **Create the container.** A fresh `Container` is created, and `Router` and the OpenAPI `Generator` are registered as singletons.
 
@@ -25,4 +25,4 @@ The route cache fingerprint is computed from:
 - `.env`
 - All files under `app/`
 
-If any of these change, the fingerprint changes and the cache is rebuilt on the next boot. Changes made anywhere else (for example a real environment variable, or routes loaded from a `config/` file) are not detected; run `php bin/antares cache:clear` after those.
+If any of these change, the fingerprint changes and the cache is rebuilt on the next boot. Changes made anywhere else (for example a real environment variable, or routes loaded from a `config/` file) are not detected; run `php vendor/bin/antares cache:clear` after those.

@@ -32,7 +32,7 @@ APP_DOCS=false   # force docs off, e.g. locally
 | any | `true` | on |
 | any | `false` | off |
 
-In production the route list is cached. Changing `APP_DOCS` in `.env` rebuilds the cache automatically. If you set it as a real server environment variable instead, run `php bin/antares cache:clear` after changing it.
+In production the route list is cached. Changing `APP_DOCS` in `.env` rebuilds the cache automatically. If you set it as a real server environment variable instead, run `php vendor/bin/antares cache:clear` after changing it.
 
 :::caution[Changed in 0.2]
 In 0.1 the docs were always on, including in production. If you want them on a production server, add `APP_DOCS=true`.
